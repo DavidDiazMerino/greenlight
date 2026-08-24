@@ -12,6 +12,8 @@ export function buildLog(result: MediaQaResult, digest: string, timestamp: strin
     safe_area_bbox: bounds ? [bounds.x, bounds.y, bounds.width, bounds.height] : null,
     violation_px: result.violationPx,
     compositor_digest: digest,
+    render_path: result.renderPath,
+    compositor_passes: result.compositorPasses,
     provenance: "local/synthetic",
   };
 }
@@ -32,6 +34,8 @@ export function buildTrace(result: MediaQaResult, digest: string, baseUnixMs: nu
     variant: result.variant,
     clip_id: result.clipId,
     compositor_digest: digest,
+    render_path: result.renderPath,
+    compositor_passes: result.compositorPasses,
     provenance: "local/synthetic",
   };
   const root: Span = {
@@ -70,6 +74,6 @@ export function prometheusText(metrics: MediaQaResult[]): string {
     ["greenlight_run_completed", (m) => Number(m.runCompleted)],
   ];
   return `${specs.flatMap(([name, get]) => metrics.map((metric) =>
-    `${name}{variant="${metric.variant}",clip_id="${metric.clipId}",experiment_id="${metric.experimentId}"} ${get(metric)}`
+    `${name}{variant="${metric.variant}",render_path="${metric.renderPath}",clip_id="${metric.clipId}",experiment_id="${metric.experimentId}"} ${get(metric)}`
   )).join("\n")}\n`;
 }

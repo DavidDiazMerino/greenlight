@@ -307,6 +307,13 @@ export function validateDecisionArtifactShapes(card: DecisionCard, casefile: Evi
   );
   requireShape(card.canaryPack?.version && Array.isArray(card.canaryPack.invariants), "versioned canary pack");
   requireShape(card.canaryRun?.fingerprint, "canary run fingerprint");
+  requireShape(
+    card.renderComparison?.baseline?.path === "baseline-multipass" &&
+    card.renderComparison.baseline.compositorPasses === 2 &&
+    card.renderComparison?.candidate?.path === "candidate-fused" &&
+    card.renderComparison.candidate.compositorPasses === 1,
+    "render path comparison",
+  );
   requireShape(card.decisionReceiptFingerprint === receipt.fingerprint, "receipt fingerprint");
   requireShape(receipt.immutable && receipt.policy.owner === "deterministic-policy-evaluator", "immutable policy-owned receipt");
   requireShape(outcome.observationStatus === "fixture/not-observed" && outcome.observedAt === null, "honest outcome fixture");

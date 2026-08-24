@@ -7,13 +7,13 @@ Last updated: 2026-08-24.
 - Dependency-free Node/TypeScript runner and static Decision Card build.
 - Eight original synthetic 16:9 cases with locked captions and edit plans.
 - Actual PNG and H.264 MP4 generation through the installed FFmpeg.
-- Baseline and release-candidate caption compositors with a reproducible multiline coordinate-space defect.
+- A baseline compositor that materializes two raster passes and a one-pass fused release candidate with a reproducible multiline coordinate-space defect.
 - Pixel-diff caption bounds measured from decoded RGB frames against a no-caption render.
 - FFprobe output dimensions/duration validity, run coverage, structured logs, trace-shaped evidence, Prometheus metrics, evidence hashing, and deterministic policy evaluation.
 - Local/synthetic provenance and MCP-required insufficient-evidence guardrail.
 - Typed `Change`, provenance-preserving `EvidenceItem`, `Signal`, `EvidenceResilienceAssessment`, `EvidenceCasefile`, versioned `CanaryPack`/`Invariant`, `CanaryRun`, immutable `DecisionReceipt`, and fixture-level `DecisionOutcome` records.
 - Explicit categorical evidence support checks and content fingerprints; no confidence percentage or uncalibrated success probability is emitted.
-- Applicability, paired baseline-pass/candidate-fail reproduction, full pack coverage, authoritative-within-fixture source counts, a disclosed non-blocking timing contradiction, recommendation eligibility, and suppression reasons.
+- Applicability, paired baseline-pass/candidate-fail reproduction, full pack coverage, authoritative-within-fixture source counts, exact render-path/timing evidence, contradiction retention, recommendation eligibility, and suppression reasons.
 - A versioned eight-case Canary Pack with four named invariants. The caption safe-area invariant blocks rc1; policy ignores any AI-style suggested action.
 - Content-addressed decision receipts and an outcome fixture explicitly marked `fixture/not-observed`, with no production outcome claim.
 - Expanded accessible Decision Card evidence details, workflow relevance, support checks, contradiction, reproduction, named invariants, deterministic policy owner, and receipt fingerprint while retaining the media comparison.

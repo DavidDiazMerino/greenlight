@@ -1,4 +1,5 @@
 export type Variant = "baseline" | "candidate";
+export type RenderPath = "baseline-multipass" | "candidate-fused";
 export type EvidenceKind = "metrics" | "logs" | "traces";
 export type Provenance = "local/synthetic" | "grafana-mcp";
 export type DecisionVerdict = "PROMOTE" | "HOLD" | "REJECT";
@@ -68,6 +69,8 @@ export interface MediaQaResult {
   durationSeconds: number;
   expectedDurationSeconds: number;
   renderDurationMs: number;
+  renderPath: RenderPath;
+  compositorPasses: number;
   runCompleted: boolean;
   traceId: string;
 }
@@ -81,6 +84,8 @@ export interface LocalLog {
   safe_area_bbox: [number, number, number, number] | null;
   violation_px: number;
   compositor_digest: string;
+  render_path: RenderPath;
+  compositor_passes: number;
   provenance: "local/synthetic";
 }
 
@@ -368,6 +373,11 @@ export interface DecisionCard extends PolicyDecision {
   canaryRun: CanaryRun;
   decisionReceiptFingerprint: string;
   policyOwner: "deterministic-policy-evaluator";
+  renderComparison: {
+    baseline: { path: RenderPath; compositorPasses: number; p95DurationMs: number };
+    candidate: { path: RenderPath; compositorPasses: number; p95DurationMs: number };
+    candidateP95Improvement: number;
+  };
   hero: {
     clipId: string;
     baselineVideo: string;

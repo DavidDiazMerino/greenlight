@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { join } from "node:path";
 import { DeterministicExperimentPlanner } from "../src/adapters/gemini.ts";
-import { captionLayout } from "../src/media.ts";
+import { captionLayout, renderPipeline } from "../src/media.ts";
 import { evaluatePolicy, loadPolicy } from "../src/policy.ts";
 import type { CanaryRun, CandidateManifest, Dataset, EvidenceBundle, EvidenceResilienceAssessment, MediaQaResult, Variant } from "../src/types.ts";
 import { projectRoot, readJson } from "../src/util.ts";
@@ -31,6 +31,8 @@ function metric(index: number, variant: Variant, safeAreaPass = true): MediaQaRe
     durationSeconds: 6,
     expectedDurationSeconds: 6,
     renderDurationMs: variant === "baseline" ? 1000 + index : 950 + index,
+    renderPath: variant === "baseline" ? "baseline-multipass" : "candidate-fused",
+    compositorPasses: variant === "baseline" ? 2 : 1,
     runCompleted: true,
     traceId: `${variant}-${index}`,
   };
@@ -57,6 +59,8 @@ function bundle(candidateFailures: number): EvidenceBundle {
       safe_area_bbox: item.captionBounds ? [item.captionBounds.x, item.captionBounds.y, item.captionBounds.width, item.captionBounds.height] : null,
       violation_px: item.violationPx,
       compositor_digest: "sha256:test",
+      render_path: item.renderPath,
+      compositor_passes: item.compositorPasses,
       provenance: "local/synthetic",
     })),
     traces: metrics.map((item, index) => ({
@@ -162,6 +166,19 @@ test("rc1 coordinate transform places multiline blocks outside the safe area", a
   const safeBottom = dataset.safeArea.y + dataset.safeArea.height;
   assert.ok(baseline.y + baseline.height <= safeBottom);
   assert.ok(candidate.y + candidate.height > safeBottom);
+});
+
+test("candidate uses one real compositor pass while baseline materializes two", () => {
+  assert.deepEqual(renderPipeline("baseline"), {
+    path: "baseline-multipass",
+    compositorPasses: 2,
+    stages: ["portrait-caption-raster", "delivery-raster-normalization"],
+  });
+  assert.deepEqual(renderPipeline("candidate"), {
+    path: "candidate-fused",
+    compositorPasses: 1,
+    stages: ["fused-portrait-caption-delivery-raster"],
+  });
 });
 
 test("deterministic Experiment Agent selects all eight affected clips", async () => {

@@ -156,6 +156,7 @@ test("decision artifacts expose auditable casefile, receipt, outcome, and access
     evidenceCasefile: { schemaVersion: "1.0", id: "casefile:test", fingerprint: "sha256:casefile", signal: { evidenceAssessmentVersion: "evidence-assessment/v1", supportChecks: [{ name: "fixture", status: "verified", basis: "test fixture" }] }, evidence: [item("evidence:a")], contradictions: [], resilience: { recommendationEligible: true }, affectedInventory: ["caption-compositor"], replay: "npm run canary" },
     canaryPack: { schemaVersion: "1.0", id: "vertical-social", version: "1.0.0", fingerprint: "sha256:pack", invariants: [] },
     canaryRun: { schemaVersion: "1.0", id: "run:test", fingerprint: "sha256:run", blockingFailures: [] },
+    renderComparison: { baseline: { path: "baseline-multipass", compositorPasses: 2, p95DurationMs: 1000 }, candidate: { path: "candidate-fused", compositorPasses: 1, p95DurationMs: 900 }, candidateP95Improvement: 0.1 },
     decisionReceiptFingerprint: receipt.fingerprint,
     policyOwner: "deterministic-policy-evaluator",
   } as unknown as DecisionCard;

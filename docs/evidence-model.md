@@ -28,7 +28,7 @@ The receipt object is emitted with `immutable: true` and frozen in memory before
 
 ## Evidence assessment and resilience
 
-`evidence-assessment/v1` records each support check as `verified`, `contradicted`, or `missing`. Greenlight does not derive a percentage or present the assessment as a probability. The local rc1 signal records source authority within the fixture, provenance integrity, direct applicability, paired reproduction, full canary coverage, and the timing contradiction.
+`evidence-assessment/v1` records each support check as `verified`, `contradicted`, or `missing`. Greenlight does not derive a percentage or present the assessment as a probability. The local rc1 signal records source authority within the fixture, provenance integrity, direct applicability, paired reproduction, full canary coverage, and whether that run reproduced the intended one-pass performance benefit.
 
 The resilience evaluator requires:
 

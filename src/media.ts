@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Clip, Dataset, MediaQaResult, Rect, Variant } from "./types.ts";
+import type { Clip, Dataset, MediaQaResult, Rect, RenderPath, Variant } from "./types.ts";
 import { rel, stableId, writeJson } from "./util.ts";
 
 const FFMPEG_ARGS = ["-hide_banner", "-loglevel", "error", "-y"];
@@ -122,6 +122,29 @@ function pngToMp4(pngPath: string, mp4Path: string, duration: number, fps: numbe
   ], 64 * 1024 * 1024);
 }
 
+function normalizeDeliveryPng(inputPath: string, outputPath: string, width: number, height: number): void {
+  command("ffmpeg", [
+    ...FFMPEG_ARGS,
+    "-i", inputPath,
+    "-vf", `scale=${width}:${height}:flags=lanczos`,
+    "-frames:v", "1", outputPath,
+  ]);
+}
+
+export function renderPipeline(variant: Variant): { path: RenderPath; compositorPasses: number; stages: string[] } {
+  return variant === "baseline"
+    ? {
+        path: "baseline-multipass",
+        compositorPasses: 2,
+        stages: ["portrait-caption-raster", "delivery-raster-normalization"],
+      }
+    : {
+        path: "candidate-fused",
+        compositorPasses: 1,
+        stages: ["fused-portrait-caption-delivery-raster"],
+      };
+}
+
 export async function generateOriginal(clip: Clip, dataset: Dataset, root: string): Promise<{ poster: string; video: string }> {
   const dir = join(root, clip.id);
   const poster = join(dir, "master-16x9.png");
@@ -154,15 +177,29 @@ export async function renderVariant(
   dataset: Dataset,
   variant: Variant,
   mediaDir: string,
-): Promise<{ poster: string; video: string; renderDurationMs: number; declaredLayout: CaptionLayout }> {
+): Promise<{ poster: string; video: string; renderDurationMs: number; declaredLayout: CaptionLayout; renderPath: RenderPath; compositorPasses: number }> {
   const dir = join(mediaDir, clip.id);
   const poster = join(dir, `${variant}.png`);
   const video = join(dir, `${variant}.mp4`);
+  const pipeline = renderPipeline(variant);
   const start = process.hrtime.bigint();
-  await svgToPng(portraitSvg(clip, dataset, variant), join(dir, `${variant}.svg`), poster, dataset.output.width, dataset.output.height);
+  if (variant === "baseline") {
+    const intermediate = join(dir, `${variant}-intermediate.png`);
+    await svgToPng(portraitSvg(clip, dataset, variant), join(dir, `${variant}.svg`), intermediate, dataset.output.width, dataset.output.height);
+    normalizeDeliveryPng(intermediate, poster, dataset.output.width, dataset.output.height);
+  } else {
+    await svgToPng(portraitSvg(clip, dataset, variant), join(dir, `${variant}.svg`), poster, dataset.output.width, dataset.output.height);
+  }
   pngToMp4(poster, video, clip.durationSeconds, dataset.output.fps);
   const renderDurationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
-  return { poster, video, renderDurationMs, declaredLayout: captionLayout(clip, dataset, variant) };
+  return {
+    poster,
+    video,
+    renderDurationMs,
+    declaredLayout: captionLayout(clip, dataset, variant),
+    renderPath: pipeline.path,
+    compositorPasses: pipeline.compositorPasses,
+  };
 }
 
 function rgbFrame(path: string): Buffer {
@@ -220,8 +257,10 @@ export function runMediaQa(args: {
   posterPath: string;
   videoPath: string;
   renderDurationMs: number;
+  renderPath: RenderPath;
+  compositorPasses: number;
 }): MediaQaResult {
-  const { experimentId, clip, dataset, variant, noCaptionPath, posterPath, videoPath, renderDurationMs } = args;
+  const { experimentId, clip, dataset, variant, noCaptionPath, posterPath, videoPath, renderDurationMs, renderPath, compositorPasses } = args;
   const bounds = measuredDiffBounds(noCaptionPath, posterPath, dataset.output.width, dataset.output.height);
   const violationPx = violation(bounds, dataset.safeArea);
   const info = probe(videoPath);
@@ -243,6 +282,8 @@ export function runMediaQa(args: {
     durationSeconds: info.duration,
     expectedDurationSeconds: clip.durationSeconds,
     renderDurationMs: Math.round(renderDurationMs * 10) / 10,
+    renderPath,
+    compositorPasses,
     runCompleted: true,
     traceId: stableId(experimentId, variant, clip.id, "trace").slice(0, 32),
   };

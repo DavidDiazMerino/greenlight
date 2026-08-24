@@ -8,7 +8,7 @@ This repository contains a complete, honest local vertical slice. Its generated 
 
 ## What the demo proves
 
-`caption-compositor@0.1.0` lays captions out in the final 1080×1920 coordinate space. `caption-compositor@0.2.0-rc1` fuses the path but, for multiline captions, derives the block anchor in 1280×720 pre-transform coordinates and then applies the portrait Y scale. That real algorithmic defect pushes some caption pixels below the committed safe area.
+`caption-compositor@0.1.0` lays captions out in the final 1080×1920 coordinate space and materializes a delivery-normalization pass after its portrait-caption raster. `caption-compositor@0.2.0-rc1` emits the delivery raster in one fused compositor pass but, for multiline captions, derives the block anchor in 1280×720 pre-transform coordinates and then applies the portrait Y scale. That real algorithmic defect pushes some caption pixels below the committed safe area.
 
 The QA does not trust those declared coordinates. FFmpeg decodes a no-caption PNG and the captioned PNG to RGB, then Greenlight computes the changed-pixel bounding box. FFprobe independently checks each MP4's dimensions and duration. The policy in [`policy/vertical-delivery-v1.yaml`](policy/vertical-delivery-v1.yaml) makes a failed 100% safe-area gate a deterministic `HOLD`.
 
@@ -70,7 +70,7 @@ The eight source cases and asset rights are documented in [`dataset/vertical-soc
 
 Local mode is for reproducible development and judging: complete local metrics/logs/traces plus a hashed local runner receipt may drive the visibly local Decision Card. It cannot be relabelled as MCP evidence.
 
-The evidence model uses categorical `verified`, `contradicted`, and `missing` support checks. It deliberately emits no confidence percentage or success probability. A disclosed contradiction records when local wall-clock timing does not independently prove the candidate's intended performance benefit; it suppresses recommendation eligibility but does not negate the directly reproduced pixel regression or change the blocking gate's `HOLD`. An authoritative flag means authoritative **within this repository-owned synthetic fixture**, never third-party truth.
+The evidence model uses categorical `verified`, `contradicted`, and `missing` support checks. It deliberately emits no confidence percentage or success probability. Every run attaches the exact one-pass/two-pass path and p95 timing; because wall-clock timing is environment-dependent, a run that fails to reproduce the intended benefit is retained as a contradiction. That does not negate the directly reproduced pixel regression or change the blocking gate's `HOLD`. An authoritative flag means authoritative **within this repository-owned synthetic fixture**, never third-party truth.
 
 Recommendation eligibility is conservative. Missing authority, contradictory evidence, an inapplicable component/version/code path, incomplete paired reproduction, or incomplete Canary Pack coverage suppresses promotion and produces `HOLD — INSUFFICIENT EVIDENCE` when the delivery gates otherwise pass. A failed blocking invariant also remains `HOLD`; an AI-style suggested action is not an input with decision authority.
 

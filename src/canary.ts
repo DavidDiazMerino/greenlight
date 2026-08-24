@@ -65,8 +65,8 @@ export async function runCanary(): Promise<CanaryResult> {
   if (dataset.clips.length !== 8) throw new Error(`vertical-social-v1 must contain exactly 8 clips; found ${dataset.clips.length}`);
 
   const implementationHash = await hashFile(join(projectRoot, "src", "media.ts"));
-  const baselineDigest = compositorDigest(manifest.baseline, "final-portrait-canvas-safe-area-anchor", implementationHash);
-  const candidateDigest = compositorDigest(manifest.candidate, "pre-transform-anchor-mapped-after-layout", implementationHash);
+  const baselineDigest = compositorDigest(manifest.baseline, "two-pass-final-portrait-safe-area-anchor", implementationHash);
+  const candidateDigest = compositorDigest(manifest.candidate, "fused-pre-transform-anchor-mapped-after-layout", implementationHash);
   const experimentId = `gl-local-${stableId(datasetHash, manifestHash, loadedPolicy.hash, baselineDigest, candidateDigest).slice(0, 12)}`;
   const artifactDir = join(projectRoot, "artifacts", experimentId);
   const mediaDir = join(artifactDir, "media");
@@ -112,11 +112,14 @@ export async function runCanary(): Promise<CanaryResult> {
         posterPath: rendered.poster,
         videoPath: rendered.video,
         renderDurationMs: rendered.renderDurationMs,
+        renderPath: rendered.renderPath,
+        compositorPasses: rendered.compositorPasses,
       });
       metrics.push(qa);
       await writeJson(join(mediaDir, clip.id, `${variant}-qa.json`), {
         ...qa,
         declaredLayout: rendered.declaredLayout,
+        renderPipeline: { path: rendered.renderPath, compositorPasses: rendered.compositorPasses },
         qaMethod: "decoded RGB pixel diff against no-caption portrait render",
       });
       process.stdout.write(`[${clipIndex + 1}/8] ${clip.id} ${variant}: safe=${qa.safeAreaPass} violation=${qa.violationPx}px valid=${qa.outputValid} render=${qa.renderDurationMs}ms\n`);
@@ -228,14 +231,17 @@ export async function runCanary(): Promise<CanaryResult> {
     claim: `vertical-delivery@${loadedPolicy.policy.version} requires 100% caption safe-area and output-validity pass rates across 16 runs.`,
     observedAt: generatedAt, synthetic: true, blocking: false,
   });
-  const performanceContradiction = createEvidenceItem({
-    idHint: `${experimentId}:timing-contradiction`, sourceType: "telemetry",
+  const candidateFaster = candidateP95 < baselineP95;
+  const performanceEvidence = createEvidenceItem({
+    idHint: `${experimentId}:timing-comparison`, sourceType: "telemetry",
     provenance: { scope: "local/synthetic", producer: "local wall-clock timing", artifact: `artifacts/${experimentId}/metrics.json`, sourceFingerprint: fingerprint({ baselineP95, candidateP95 }) },
-    authoritative: false, independenceGroup: "local-run-timing", relationship: "contradicts",
-    claim: `The local wall-clock p95 (${round(baselineP95, 1)}ms baseline, ${round(candidateP95, 1)}ms candidate) is environment-dependent and does not independently establish the candidate's intended speed benefit. This does not contradict the decoded-pixel regression.`,
+    authoritative: false, independenceGroup: "local-run-timing", relationship: candidateFaster ? "supports" : "contradicts",
+    claim: candidateFaster
+      ? `This local run measures ${round(baselineP95, 1)}ms baseline p95 across the two-pass compositor and ${round(candidateP95, 1)}ms candidate p95 across the fused compositor. Wall-clock timing is environment-dependent; the exact paths and measurements remain attached.`
+      : `This local run measures ${round(baselineP95, 1)}ms baseline p95 and ${round(candidateP95, 1)}ms candidate p95, so it does not reproduce the intended fused-path speed benefit. This does not contradict the decoded-pixel regression.`,
     observedAt: generatedAt, synthetic: true, blocking: false,
   });
-  const evidenceItems: EvidenceItem[] = [manifestChangeEvidence, manifestDefectEvidence, datasetEvidence, ...qaEvidence, renderEvidence, logEvidence, traceEvidence, policyEvidence, performanceContradiction];
+  const evidenceItems: EvidenceItem[] = [manifestChangeEvidence, manifestDefectEvidence, datasetEvidence, ...qaEvidence, renderEvidence, logEvidence, traceEvidence, policyEvidence, performanceEvidence];
   const signal = createSignal({
     change,
     kind: "behavior_change",
@@ -248,7 +254,11 @@ export async function runCanary(): Promise<CanaryResult> {
       { name: "direct_applicability", status: "verified", basis: "component, rc1 version, and multiline caption path match Maya's workflow" },
       { name: "baseline_candidate_reproduction", status: "verified", basis: "locked baseline passes and the same five candidate clips fail decoded-pixel QA" },
       { name: "canary_coverage", status: "verified", basis: "8/8 cases and 16/16 paired runs completed" },
-      { name: "performance_claim", status: "contradicted", basis: "local timing does not independently prove the intended performance benefit" },
+      {
+        name: "performance_claim",
+        status: candidateFaster ? "verified" : "contradicted",
+        basis: `${round(baselineP95, 1)}ms baseline p95 (two passes) versus ${round(candidateP95, 1)}ms candidate p95 (one fused pass) in this local run`,
+      },
     ],
   });
   const baselinePasses = metrics.filter((item) => item.variant === "baseline").every((item) => item.safeAreaPass && item.outputValid);
@@ -269,7 +279,7 @@ export async function runCanary(): Promise<CanaryResult> {
   const evidenceIdsByMetric = {
     caption_safe_area_pass_rate: qaEvidence.map((item) => item.id),
     output_validity_pass_rate: [renderEvidence.id],
-    p95_render_duration: [performanceContradiction.id],
+    p95_render_duration: [performanceEvidence.id],
     run_coverage: [datasetEvidence.id, renderEvidence.id],
   };
   const canaryRun = createCanaryRun({
@@ -321,6 +331,11 @@ export async function runCanary(): Promise<CanaryResult> {
     canaryRun,
     decisionReceiptFingerprint: decisionReceipt.fingerprint,
     policyOwner: "deterministic-policy-evaluator",
+    renderComparison: {
+      baseline: { path: heroBaseline.renderPath, compositorPasses: heroBaseline.compositorPasses, p95DurationMs: round(baselineP95, 1) },
+      candidate: { path: heroCandidate.renderPath, compositorPasses: heroCandidate.compositorPasses, p95DurationMs: round(candidateP95, 1) },
+      candidateP95Improvement: baselineP95 === 0 ? 0 : round((baselineP95 - candidateP95) / baselineP95),
+    },
     hero: {
       clipId: heroCandidate.clipId,
       baselineVideo: `/artifacts/${experimentId}/media/${heroCandidate.clipId}/baseline.mp4`,
@@ -343,6 +358,7 @@ export async function runCanary(): Promise<CanaryResult> {
     maximumViolationPx: maxViolation,
     baselineP95RenderDurationMs: round(baselineP95, 1),
     candidateP95RenderDurationMs: round(candidateP95, 1),
+    candidateP95Improvement: baselineP95 === 0 ? 0 : round((baselineP95 - candidateP95) / baselineP95),
     runCoverage: metrics.length,
     expectedCoverage: loadedPolicy.policy.requiredRunCoverage,
     datasetHash,

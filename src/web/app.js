@@ -31,10 +31,11 @@ function videoPanel(card, variant) {
   const bounds = isBaseline ? card.hero.baselineBounds : card.hero.candidateBounds;
   const path = isBaseline ? card.hero.baselineVideo : card.hero.candidateVideo;
   const poster = isBaseline ? card.hero.baselinePoster : card.hero.candidatePoster;
+  const pipeline = isBaseline ? card.renderComparison?.baseline : card.renderComparison?.candidate;
   const gate = list(card.gates).find((item) => item.metric === "caption_safe_area_pass_rate");
   const passed = gate && (isBaseline ? gate.baseline === 1 : gate.candidate === 1);
   return `<article class="video-panel ${passed ? "pass" : "fail"}">
-    <div class="video-title"><span>${isBaseline ? "BASELINE" : "CANDIDATE"}</span><b>${safe(isBaseline ? card.baselineVersion : card.candidateVersion)}</b></div>
+    <div class="video-title"><span>${isBaseline ? "BASELINE" : "CANDIDATE"}</span><b>${safe(isBaseline ? card.baselineVersion : card.candidateVersion)}</b><small>${safe(pipeline?.path)} · ${safe(pipeline?.compositorPasses)} compositor pass${pipeline?.compositorPasses === 1 ? "" : "es"}</small></div>
     <div class="portrait-wrap">
       <video class="portrait-video" data-variant="${variant}" muted loop playsinline preload="metadata" poster="${safe(poster)}" src="${safe(path)}"></video>
       <div class="safe-area"><span>9:16 SAFE AREA</span></div>
