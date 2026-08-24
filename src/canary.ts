@@ -45,7 +45,9 @@ async function artifactIndex(root: string, current = root): Promise<Array<{ path
 
 function gitCommit(): string {
   const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: projectRoot, encoding: "utf8" });
-  return result.status === 0 ? result.stdout.trim() : "uncommitted-local-worktree";
+  if (result.status !== 0) return "uncommitted-local-worktree";
+  const status = spawnSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd: projectRoot, encoding: "utf8" });
+  return `${result.stdout.trim()}${status.status === 0 && status.stdout.trim() ? "-dirty" : ""}`;
 }
 
 export async function runCanary(): Promise<CanaryResult> {
@@ -239,14 +241,14 @@ export async function runCanary(): Promise<CanaryResult> {
     kind: "behavior_change",
     affectedAssets: failures.map((item) => item.clipId),
     evidence: [manifestDefectEvidence, ...qaEvidence],
-    confidenceVersion: "evidence-confidence/v1",
-    confidenceComponents: [
-      { name: "source_authority", value: 0.2, basis: "repository-owned manifest discloses the local candidate and defect" },
-      { name: "provenance_integrity", value: 0.15, basis: "all evidence is content-fingerprinted and explicitly local/synthetic" },
-      { name: "direct_applicability", value: 0.2, basis: "component, rc1 version, and multiline caption path match Maya's workflow" },
-      { name: "baseline_candidate_reproduction", value: 0.25, basis: "locked baseline passes and the same five candidate clips fail decoded-pixel QA" },
-      { name: "canary_coverage", value: 0.15, basis: "8/8 cases and 16/16 paired runs completed" },
-      { name: "non_blocking_contradiction", value: -0.05, basis: "local timing cannot independently prove the intended performance benefit" },
+    evidenceAssessmentVersion: "evidence-assessment/v1",
+    supportChecks: [
+      { name: "source_authority", status: "verified", basis: "repository-owned manifest discloses the local candidate and defect" },
+      { name: "provenance_integrity", status: "verified", basis: "all evidence is content-fingerprinted and explicitly local/synthetic" },
+      { name: "direct_applicability", status: "verified", basis: "component, rc1 version, and multiline caption path match Maya's workflow" },
+      { name: "baseline_candidate_reproduction", status: "verified", basis: "locked baseline passes and the same five candidate clips fail decoded-pixel QA" },
+      { name: "canary_coverage", status: "verified", basis: "8/8 cases and 16/16 paired runs completed" },
+      { name: "performance_claim", status: "contradicted", basis: "local timing does not independently prove the intended performance benefit" },
     ],
   });
   const baselinePasses = metrics.filter((item) => item.variant === "baseline").every((item) => item.safeAreaPass && item.outputValid);

@@ -101,11 +101,11 @@ test("an all-pass comparison is promotable with complete local evidence", async 
   assert.equal(result.deploymentBlocked, false);
 });
 
-test("complete canary evidence without recommendation eligibility requires review", async () => {
+test("complete canary evidence without recommendation eligibility remains on hold", async () => {
   const { policy } = await fixture();
   const result = evaluatePolicy(bundle(0), policy);
-  assert.equal(result.decision, "REVIEW");
-  assert.equal(result.reason, "EVIDENCE_NOT_ELIGIBLE");
+  assert.equal(result.decision, "HOLD");
+  assert.equal(result.reason, "INSUFFICIENT_EVIDENCE");
   assert.equal(result.deploymentBlocked, true);
 });
 
@@ -115,9 +115,9 @@ test("contradictory or inapplicable evidence cannot promote an otherwise passing
   resilience.recommendationEligible = false;
   resilience.applicability.codePathReachable = false;
   resilience.corroboration.contradictions = 1;
-  resilience.suppressionReasons = ["CONTRADICTORY_EVIDENCE_REQUIRES_REVIEW", "CODE_PATH_NOT_REACHABLE"];
+  resilience.suppressionReasons = ["CONTRADICTORY_EVIDENCE_BLOCKS_PROMOTION", "CODE_PATH_NOT_REACHABLE"];
   const result = evaluatePolicy(bundle(0), policy, { requireMcp: false, resilience, suggestedAction: "PROMOTE" });
-  assert.equal(result.decision, "REVIEW");
+  assert.equal(result.decision, "HOLD");
   assert.equal(result.deploymentBlocked, true);
 });
 

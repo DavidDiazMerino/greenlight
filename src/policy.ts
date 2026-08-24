@@ -115,8 +115,8 @@ export function evaluatePolicy(
   }
   if (options.resilience?.recommendationEligible !== true) {
     return {
-      decision: "REVIEW",
-      reason: "EVIDENCE_NOT_ELIGIBLE",
+      decision: "HOLD",
+      reason: "INSUFFICIENT_EVIDENCE",
       deploymentBlocked: true,
       evidenceCompleteness: `${coverage}/${policy.requiredRunCoverage} runs · metrics + logs + traces · recommendation suppressed`,
       runCoverage: coverage,

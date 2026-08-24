@@ -2,7 +2,7 @@ import type {
   CanaryPack,
   CanaryRun,
   Change,
-  ConfidenceComponent,
+  EvidenceSupportCheck,
   Dataset,
   DecisionCard,
   DecisionOutcome,
@@ -37,12 +37,11 @@ export function createSignal(input: {
   kind: Signal["kind"];
   affectedAssets: string[];
   evidence: EvidenceItem[];
-  confidenceComponents: ConfidenceComponent[];
-  confidenceVersion: string;
+  supportChecks: EvidenceSupportCheck[];
+  evidenceAssessmentVersion: string;
 }): Signal {
   const evidence = [...input.evidence].sort((left, right) => left.id.localeCompare(right.id));
   const evidenceFingerprint = fingerprintEvidenceItems(evidence);
-  const confidence = round(Math.max(0, Math.min(1, input.confidenceComponents.reduce((total, component) => total + component.value, 0))), 3);
   return {
     schemaVersion: "1.0",
     id: `signal:${stableId(input.change.id, input.kind, evidenceFingerprint).slice(0, 16)}`,
@@ -51,9 +50,8 @@ export function createSignal(input: {
     kind: input.kind,
     affectedAssets: [...input.affectedAssets].sort(),
     evidenceIds: evidence.map((item) => item.id),
-    confidence,
-    confidenceVersion: input.confidenceVersion,
-    confidenceComponents: input.confidenceComponents,
+    evidenceAssessmentVersion: input.evidenceAssessmentVersion,
+    supportChecks: input.supportChecks,
     evidenceFingerprint,
     status: evidence.length > 0 ? "validated" : "candidate",
   };
@@ -82,7 +80,7 @@ export function assessEvidenceResilience(input: {
   const coverageComplete = input.selectedCases === input.totalCases && input.completedRuns >= input.requiredRuns;
   const suppressionReasons: string[] = [];
   if (authoritativeGroups.size === 0) suppressionReasons.push("NO_AUTHORITATIVE_SOURCE");
-  if (contradictions.length > 0) suppressionReasons.push("CONTRADICTORY_EVIDENCE_REQUIRES_REVIEW");
+  if (contradictions.length > 0) suppressionReasons.push("CONTRADICTORY_EVIDENCE_BLOCKS_PROMOTION");
   if (blockingContradictions.length > 0) suppressionReasons.push("UNRESOLVED_BLOCKING_CONTRADICTION");
   if (!input.componentActuallyUsed) suppressionReasons.push("COMPONENT_NOT_IN_WORKFLOW");
   if (!input.affectedVersionMatches) suppressionReasons.push("VERSION_NOT_APPLICABLE");
@@ -301,7 +299,12 @@ export function validateDecisionArtifactShapes(card: DecisionCard, casefile: Evi
   requireShape(card.change?.id, "card.change.id");
   requireShape(card.evidenceCasefile?.fingerprint === casefile.fingerprint, "card casefile commitment");
   requireShape(Array.isArray(casefile.evidence) && casefile.evidence.length > 0, "casefile evidence");
-  requireShape(typeof casefile.signal?.confidence === "number" && casefile.signal.confidenceVersion, "signal confidence basis");
+  requireShape(
+    typeof casefile.signal?.evidenceAssessmentVersion === "string" &&
+    Array.isArray(casefile.signal.supportChecks) &&
+    casefile.signal.supportChecks.length > 0,
+    "signal evidence assessment",
+  );
   requireShape(card.canaryPack?.version && Array.isArray(card.canaryPack.invariants), "versioned canary pack");
   requireShape(card.canaryRun?.fingerprint, "canary run fingerprint");
   requireShape(card.decisionReceiptFingerprint === receipt.fingerprint, "receipt fingerprint");

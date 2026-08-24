@@ -19,7 +19,7 @@ Greenlight intentionally does not invent tool names. A real integration must:
 
 Without all three valid receipt categories, that path returns `HOLD — INSUFFICIENT EVIDENCE`. The local runner writes this negative-path result to `policy-evaluation-mcp-required.json` as proof of the guardrail; it is not a simulated MCP call.
 
-Complete MCP receipts alone do not authorize promotion. If resilience is absent or suppressed, an otherwise passing candidate remains blocked for `REVIEW`. Any failed blocking canary remains `HOLD`. The deterministic evaluator—not Grafana, Gemini, ADK, or narrative prose—owns these state transitions.
+Complete MCP receipts alone do not authorize promotion. If resilience is absent or suppressed, an otherwise passing candidate remains at `HOLD — INSUFFICIENT EVIDENCE`. Any failed blocking canary remains `HOLD`. The deterministic evaluator—not Grafana, Gemini, ADK, or narrative prose—owns these state transitions.
 
 ## OpenTelemetry / Grafana telemetry ingestion
 

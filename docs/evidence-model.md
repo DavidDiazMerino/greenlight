@@ -5,7 +5,7 @@ Greenlight's local vertical slice follows one content-addressed chain:
 ```text
 repository-owned Change
   → provenance-preserving EvidenceItems
-  → measured Signal + explicit confidence components
+  → measured Signal + categorical evidence support checks
   → Evidence Resilience + inspectable Casefile
   → versioned Canary Pack + invariant results
   → deterministic policy verdict
@@ -18,7 +18,7 @@ Every local record is labelled `local/synthetic`. No field implies an upstream r
 ## Fingerprint boundaries
 
 - An `EvidenceItem` fingerprints its extracted fact and exact provenance fields.
-- A `Signal` fingerprints the sorted evidence records it cites and stores `evidence-confidence/v1` plus every signed component.
+- A `Signal` fingerprints the sorted evidence records it cites and stores `evidence-assessment/v1` plus every categorical support check.
 - An `EvidenceCasefile` fingerprints the change, signal, evidence, contradictions, applicability, reproduction, coverage, and recommendation eligibility.
 - A `CanaryPack` fingerprints its dataset identity, eight named cases, and invariant definitions.
 - A `CanaryRun` fingerprints exact baseline/candidate measurements and pass/fail results; completion time is metadata outside its content fingerprint.
@@ -26,9 +26,9 @@ Every local record is labelled `local/synthetic`. No field implies an upstream r
 
 The receipt object is emitted with `immutable: true` and frozen in memory before serialization. The JSON file is content-addressed evidence, not a claim that the local filesystem is an append-only ledger.
 
-## Confidence and resilience
+## Evidence assessment and resilience
 
-`evidence-confidence/v1` is a transparent deterministic heuristic, not a probability and not yet calibrated against production outcomes. The local rc1 signal records source authority within the fixture, provenance integrity, direct applicability, paired reproduction, full canary coverage, and a negative component for the timing contradiction.
+`evidence-assessment/v1` records each support check as `verified`, `contradicted`, or `missing`. Greenlight does not derive a percentage or present the assessment as a probability. The local rc1 signal records source authority within the fixture, provenance integrity, direct applicability, paired reproduction, full canary coverage, and the timing contradiction.
 
 The resilience evaluator requires:
 
@@ -38,7 +38,7 @@ The resilience evaluator requires:
 - all eight pack cases and sixteen paired runs;
 - no unresolved blocking contradiction.
 
-Every contradiction remains visible and conservatively suppresses recommendation eligibility. A blocking contradiction adds a stronger, additional suppression reason; any applicability/reproduction/coverage failure also adds a machine-readable reason. If delivery gates pass but eligibility is absent or suppressed, policy returns `REVIEW`, never `PROMOTE`.
+Every contradiction remains visible and conservatively suppresses recommendation eligibility. A blocking contradiction adds a stronger, additional suppression reason; any applicability/reproduction/coverage failure also adds a machine-readable reason. If delivery gates pass but eligibility is absent or suppressed, policy returns `HOLD — INSUFFICIENT EVIDENCE`, never `PROMOTE`.
 
 ## Authority boundary
 
@@ -47,7 +47,7 @@ The policy evaluator consumes evidence eligibility and Canary Run results but ig
 1. incomplete or invalid provenance/coverage → `HOLD — INSUFFICIENT EVIDENCE`;
 2. invalid output → `REJECT`;
 3. failed hard gate or blocking invariant → `HOLD`;
-4. missing/suppressed recommendation eligibility → `REVIEW`;
+4. missing/suppressed recommendation eligibility → `HOLD — INSUFFICIENT EVIDENCE`;
 5. complete eligible evidence and all hard gates passing → `PROMOTE` for human action.
 
 The checked-in rc1 follows branch 3 because `caption-safe-area-9x16` fails on v02, v03, v04, v05, and v07.

@@ -46,7 +46,7 @@ Useful commands:
 
 - `make canary`: regenerate originals, render both variants, run QA/policy, and write evidence.
 - `make demo-fixture`: same deterministic local path, named for demo preparation.
-- `make test`: verify provenance/fingerprints, evidence eligibility and suppression, policy non-override, receipt sensitivity, HOLD/PROMOTE/REVIEW semantics, MCP guardrails, the layout defect, and experiment selection.
+- `make test`: verify provenance/fingerprints, evidence eligibility and suppression, policy non-override, receipt sensitivity, HOLD/PROMOTE/REJECT semantics, MCP guardrails, the layout defect, and experiment selection.
 - `make build`: copy the browser application to `dist/public`.
 - `make clean-generated`: remove only this project's generated `artifacts/` and `assets/synthetic/generated/` trees.
 
@@ -59,7 +59,7 @@ Each experiment contains:
 - `metrics.json` and Prometheus exposition using the five `greenlight_*` metric names;
 - `logs.jsonl` and `traces.json` with experiment, variant, clip, and compositor digest attributes;
 - `evidence-bundle.json`, local and MCP-required policy evaluations, summary, ExperimentSpec, and Decision Card JSON.
-- `change.json` and `evidence-casefile.json`, including the measured five-clip signal, evidence provenance, explicit confidence components, applicability, reproduction, contradiction, and suppression state;
+- `change.json` and `evidence-casefile.json`, including the measured five-clip signal, evidence provenance, categorical support checks, applicability, reproduction, contradiction, and suppression state;
 - `canary-pack.json` and `canary-run.json`, representing all eight clips and four named invariants with exact baseline/candidate gate measurements;
 - `decision-receipt.json`, whose content fingerprint commits to the change, casefile/signal, Canary Pack and results, policy hash, verdict, and reasons;
 - `decision-outcome.fixture.json`, explicitly marked `local/synthetic`, `fixture/not-observed`, and `result: unknown`—it is a contract example, not a production observation.
@@ -70,9 +70,9 @@ The eight source cases and asset rights are documented in [`dataset/vertical-soc
 
 Local mode is for reproducible development and judging: complete local metrics/logs/traces plus a hashed local runner receipt may drive the visibly local Decision Card. It cannot be relabelled as MCP evidence.
 
-The evidence model uses `evidence-confidence/v1`, an explicit deterministic heuristic—not a statistical probability or calibrated success forecast. Its positive and negative components are stored in the casefile. A disclosed contradiction records that local wall-clock timing does not independently prove the candidate's intended performance benefit; it suppresses recommendation eligibility but does not negate the directly reproduced pixel regression or change the blocking gate's `HOLD`. An authoritative flag means authoritative **within this repository-owned synthetic fixture**, never third-party truth.
+The evidence model uses categorical `verified`, `contradicted`, and `missing` support checks. It deliberately emits no confidence percentage or success probability. A disclosed contradiction records when local wall-clock timing does not independently prove the candidate's intended performance benefit; it suppresses recommendation eligibility but does not negate the directly reproduced pixel regression or change the blocking gate's `HOLD`. An authoritative flag means authoritative **within this repository-owned synthetic fixture**, never third-party truth.
 
-Recommendation eligibility is conservative. Missing authority, contradictory evidence, an inapplicable component/version/code path, incomplete paired reproduction, or incomplete Canary Pack coverage suppresses promotion and produces `REVIEW` when the delivery gates otherwise pass. A failed blocking invariant always remains `HOLD`; an AI-style suggested action is not an input with decision authority.
+Recommendation eligibility is conservative. Missing authority, contradictory evidence, an inapplicable component/version/code path, incomplete paired reproduction, or incomplete Canary Pack coverage suppresses promotion and produces `HOLD — INSUFFICIENT EVIDENCE` when the delivery gates otherwise pass. A failed blocking invariant also remains `HOLD`; an AI-style suggested action is not an input with decision authority.
 
 Production/MCP-required mode is stricter. `provenance` must be `grafana-mcp`, and the bundle must contain valid receipts for metrics, logs, and traces; the trace receipt must carry a baseline/candidate pair. Missing receipts force exactly `HOLD — INSUFFICIENT EVIDENCE`. See [`docs/integrations.md`](docs/integrations.md).
 

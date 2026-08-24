@@ -68,11 +68,11 @@ test("a strong applicable reproduced signal is recommendation eligible", () => {
     kind: "behavior_change",
     affectedAssets: ["v02", "v03", "v04", "v05", "v07"],
     evidence,
-    confidenceComponents: [
-      { name: "direct_applicability", value: 0.2, basis: "component, version, and code path match" },
-      { name: "reproduction", value: 0.25, basis: "baseline passes and candidate fails" },
+    supportChecks: [
+      { name: "direct_applicability", status: "verified", basis: "component, version, and code path match" },
+      { name: "reproduction", status: "verified", basis: "baseline passes and candidate fails" },
     ],
-    confidenceVersion: "evidence-confidence/v1",
+    evidenceAssessmentVersion: "evidence-assessment/v1",
   });
   const resilience = assessEvidenceResilience({
     signalId: signal.id,
@@ -137,7 +137,7 @@ test("decision receipt fingerprint is stable and changes with committed verdict 
   };
   const first = createDecisionReceipt(input);
   const second = createDecisionReceipt({ ...input, reasons: [...input.reasons] });
-  const changed = createDecisionReceipt({ ...input, verdict: "REVIEW" as const });
+  const changed = createDecisionReceipt({ ...input, verdict: "REJECT" as const });
   assert.equal(first.fingerprint, second.fingerprint);
   assert.notEqual(first.fingerprint, changed.fingerprint);
   assert.equal(first.commitments.policy, "sha256:policy");
@@ -153,7 +153,7 @@ test("decision artifacts expose auditable casefile, receipt, outcome, and access
   const outcome = createDecisionOutcomeFixture(receipt, observedAt);
   const card = {
     change: change(),
-    evidenceCasefile: { schemaVersion: "1.0", id: "casefile:test", fingerprint: "sha256:casefile", signal: { confidence: 0.9, confidenceVersion: "evidence-confidence/v1" }, evidence: [item("evidence:a")], contradictions: [], resilience: { recommendationEligible: true }, affectedInventory: ["caption-compositor"], replay: "npm run canary" },
+    evidenceCasefile: { schemaVersion: "1.0", id: "casefile:test", fingerprint: "sha256:casefile", signal: { evidenceAssessmentVersion: "evidence-assessment/v1", supportChecks: [{ name: "fixture", status: "verified", basis: "test fixture" }] }, evidence: [item("evidence:a")], contradictions: [], resilience: { recommendationEligible: true }, affectedInventory: ["caption-compositor"], replay: "npm run canary" },
     canaryPack: { schemaVersion: "1.0", id: "vertical-social", version: "1.0.0", fingerprint: "sha256:pack", invariants: [] },
     canaryRun: { schemaVersion: "1.0", id: "run:test", fingerprint: "sha256:run", blockingFailures: [] },
     decisionReceiptFingerprint: receipt.fingerprint,

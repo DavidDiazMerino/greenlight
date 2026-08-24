@@ -1,7 +1,7 @@
 export type Variant = "baseline" | "candidate";
 export type EvidenceKind = "metrics" | "logs" | "traces";
 export type Provenance = "local/synthetic" | "grafana-mcp";
-export type DecisionVerdict = "PROMOTE" | "HOLD" | "REJECT" | "REVIEW";
+export type DecisionVerdict = "PROMOTE" | "HOLD" | "REJECT";
 
 export interface Rect {
   x: number;
@@ -165,9 +165,9 @@ export interface EvidenceItem {
   blocking: boolean;
 }
 
-export interface ConfidenceComponent {
+export interface EvidenceSupportCheck {
   name: string;
-  value: number;
+  status: "verified" | "contradicted" | "missing";
   basis: string;
 }
 
@@ -179,9 +179,8 @@ export interface Signal {
   kind: "behavior_change" | "compatibility_risk" | "performance_regression";
   affectedAssets: string[];
   evidenceIds: string[];
-  confidence: number;
-  confidenceVersion: string;
-  confidenceComponents: ConfidenceComponent[];
+  evidenceAssessmentVersion: string;
+  supportChecks: EvidenceSupportCheck[];
   evidenceFingerprint: string;
   status: "candidate" | "validated" | "suppressed" | "needs_review";
 }
@@ -296,7 +295,7 @@ export interface GateResult {
 
 export interface PolicyDecision {
   decision: DecisionVerdict;
-  reason: "POLICY_PASSED" | "GATE_FAILED" | "INSUFFICIENT_EVIDENCE" | "INVALID_OUTPUT" | "EVIDENCE_NOT_ELIGIBLE";
+  reason: "POLICY_PASSED" | "GATE_FAILED" | "INSUFFICIENT_EVIDENCE" | "INVALID_OUTPUT";
   deploymentBlocked: boolean;
   evidenceCompleteness: string;
   runCoverage: number;

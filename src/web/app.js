@@ -45,10 +45,9 @@ function videoPanel(card, variant) {
   </article>`;
 }
 
-function confidenceComponent(component) {
-  const value = Number(component.value);
-  const signed = Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${Math.round(value * 100)} pts` : "—";
-  return `<li><span>${safe(component.name?.replaceAll("_", " "))}</span><b>${safe(signed)}</b><small>${safe(component.basis)}</small></li>`;
+function supportCheck(check) {
+  const status = ["verified", "contradicted", "missing"].includes(check.status) ? check.status : "missing";
+  return `<li class="${status}"><span>${safe(check.name?.replaceAll("_", " "))}</span><b>${safe(status.toUpperCase())}</b><small>${safe(check.basis)}</small></li>`;
 }
 
 function evidenceRow(item) {
@@ -85,7 +84,8 @@ function render(card) {
   const applicability = resilience.applicability ?? {};
   const reproduction = resilience.reproducibility ?? {};
   const sourceTypes = new Set(evidence.map((item) => item.sourceType)).size;
-  const confidence = Math.round(Number(signal.confidence ?? 0) * 100);
+  const completedRuns = Number(resilience.canaryCoverage?.completedRuns ?? card.runCoverage ?? 0);
+  const requiredRuns = Number(resilience.canaryCoverage?.requiredRuns ?? 16);
   const canaryChecks = list(card.canaryRun?.checks);
   const blocking = canaryChecks.filter((item) => item.severity === "blocking" && !item.candidatePass);
   app.innerHTML = `
@@ -134,14 +134,14 @@ function render(card) {
       <div class="section-heading evidence-heading"><div><span>02</span> EVIDENCE CASEFILE</div><p id="evidence-title">Every claim retains source, provenance, and content fingerprint.</p></div>
       <div class="evidence-summary">
         <article class="evidence-stat"><span>EVIDENCE</span><strong>${evidence.length}</strong><p>${sourceTypes} source types · ${safe(card.provenance)}</p></article>
-        <article class="evidence-stat confidence-stat"><span>HEURISTIC CONFIDENCE</span><strong>${safe(confidence)}%</strong><p>${safe(signal.confidenceVersion)} · deterministic, not statistically calibrated</p></article>
+        <article class="evidence-stat coverage-stat"><span>EVIDENCE COVERAGE</span><strong>${safe(completedRuns)}/${safe(requiredRuns)}</strong><p>paired canary runs · no probability score</p></article>
         <article class="evidence-stat"><span>CONTRADICTIONS</span><strong>${contradictions.length}</strong><p>${safe(resilience.corroboration?.unresolvedBlockingContradictions ?? 0)} unresolved blocking</p></article>
         <article class="evidence-stat"><span>RECOMMENDATION ELIGIBLE</span><strong>${resilience.recommendationEligible ? "YES" : "NO"}</strong><p>Eligibility cannot override a failed policy gate.</p></article>
       </div>
       <div class="evidence-grid">
         <article class="case-panel">
-          <span class="panel-label">CONFIDENCE BASIS</span>
-          <ul class="confidence-components">${list(signal.confidenceComponents).map(confidenceComponent).join("")}</ul>
+          <span class="panel-label">EVIDENCE SUPPORT CHECKS · ${safe(signal.evidenceAssessmentVersion)}</span>
+          <ul class="support-checks">${list(signal.supportChecks).map(supportCheck).join("")}</ul>
         </article>
         <article class="case-panel resilience-panel">
           <span class="panel-label">APPLICABILITY + REPRODUCTION</span>
