@@ -1,0 +1,22 @@
+{
+  "verificationEnvironment": {
+    "date": "2026-08-22",
+    "node": "v24.18.0",
+    "ffmpeg": "8.0.1-3ubuntu2"
+  },
+  "sources": {
+    "vertical-social-v1.json": "sha256:a9a9d0dbfcf4653e0b62c8e4700807746b18664384a1683b95b32ef785014e96",
+    "candidate-manifest.json": "sha256:18c5a2644a2df62e02982cf8649197ac8bb0caa07fc96d2d3747cb67392dd859",
+    "policy/vertical-delivery-v1.yaml": "sha256:6a909329bd4c0312ddf1dd7faeb455123439a2ae5101aaae490c8c8487494673"
+  },
+  "generatedOriginals": {
+    "v01": { "png": "sha256:c4b32df7ebd4901ae65375a61833c6b8181283131914e383c59d6fb083d87ed7", "mp4": "sha256:4247f339ec4f9983ddc2eb637bb0a1b76753558ca119a019e96e06bb1bf385a0" },
+    "v02": { "png": "sha256:8f80b909a132109c7027b3af339147c249eac270d435101d1032ced022fa65c2", "mp4": "sha256:4d7f553f4d01598a72fcb74de3869fe8a9d0e2a52043748a5f29cae73ee93e94" },
+    "v03": { "png": "sha256:5c15fb4a8bec5a083345bc3400e6ac7d5a4d216fe1edfb8484c8a01bd64a5685", "mp4": "sha256:a09743dc5d3c0b24864f6e73bac49868cc5ee0d155fe1974b0a3457b74769b98" },
+    "v04": { "png": "sha256:cc97e1e7894b5b11f7314df1d325a5e9447bbcfcb375964d4f4d4cc46f410d21", "mp4": "sha256:9b4acd760b9acf1b5e812343ba6bbcccc8d9d385f7c8065b5816e88bb15c3b9b" },
+    "v05": { "png": "sha256:8f19e630de3800cac7a28ddc728f83f666c24e10a31843737198905608b7f506", "mp4": "sha256:642fc70adbdfe3c9a6f85d395e28cdafb832aa4324b30c0e7144f369c63d7b4b" },
+    "v06": { "png": "sha256:6bbf9554a3e9e54ffc725904f990a3cdce037aeca39cd9a2db059e0501dd2b08", "mp4": "sha256:dccbda94c522a9cdf71aa71424eb6cd510b2bf34b16c27046813db830e24df87" },
+    "v07": { "png": "sha256:2a211c4dbcdf114cf59484983f0cdd2e0618a71cde2578f16b8808e8a49917d5", "mp4": "sha256:1b077b396a846a78d8fbbd44502c1ad552015e5b8aeaa676bec2df0dd58760eb" },
+    "v08": { "png": "sha256:fd3fd223bb705086cbfb191520c4dae22a4d00477fbabd3520aba3abf02db2d0", "mp4": "sha256:43139234520998706f8437bb9cfebc485e7f9185f55f93b5eee83980d0dfb22d" }
+  }
+}

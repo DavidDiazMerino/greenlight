@@ -1,0 +1,18 @@
+name: vertical-delivery
+version: v1
+required_evidence:
+  - metrics
+  - logs
+  - traces
+required_run_coverage: 16
+
+gates:
+  caption_safe_area_pass_rate:
+    required: 1.0
+    severity: hard
+  output_validity_pass_rate:
+    required: 1.0
+    severity: hard
+  p95_render_duration:
+    max_regression: 0.10
+    severity: soft

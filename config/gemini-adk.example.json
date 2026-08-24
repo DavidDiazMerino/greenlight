@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "provider": "google",
+  "runtime": "Google ADK",
+  "project": null,
+  "location": null,
+  "model": null,
+  "note": "The local demo uses DeterministicExperimentPlanner and makes no model call. Supply a real injected GoogleAdkRuntime implementation and runtime configuration before enabling."
+}

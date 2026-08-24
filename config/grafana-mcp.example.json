@@ -1,0 +1,11 @@
+{
+  "mode": "external-official-grafana-mcp",
+  "serverIdentity": null,
+  "endpointOrProcessConfiguredByHost": null,
+  "discoveredToolBindings": {
+    "metrics": null,
+    "logs": null,
+    "traces": null
+  },
+  "note": "Populate only after the MCP client lists tools from the configured official Grafana MCP server. Greenlight does not guess or pin tool names."
+}

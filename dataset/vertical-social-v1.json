@@ -1,0 +1,18 @@
+{
+  "name": "vertical-social-v1",
+  "version": "1.0.0",
+  "description": "Eight original synthetic 16:9 motion-card masters and locked caption/edit plans.",
+  "canvas": { "width": 1280, "height": 720 },
+  "output": { "width": 1080, "height": 1920, "fps": 10 },
+  "safeArea": { "x": 90, "y": 180, "width": 900, "height": 1450 },
+  "clips": [
+    { "id": "v01", "title": "FIRST LIGHT", "caption": ["A quiet frame finds its rhythm."], "durationSeconds": 6, "accent": "#70e1b5", "focusX": 0.28, "tags": ["single-line", "portrait-reframe"] },
+    { "id": "v02", "title": "THE TURN", "caption": ["Every cut begins", "with a clear intention."], "durationSeconds": 7, "accent": "#ffcf66", "focusX": 0.72, "tags": ["multiline", "portrait-reframe"] },
+    { "id": "v03", "title": "AFTER IMAGE", "caption": ["SUPERCALIFRAGILISTIC", "still has to fit."], "durationSeconds": 8, "accent": "#ff7e8d", "focusX": 0.50, "tags": ["multiline", "long-word"] },
+    { "id": "v04", "title": "NO SECOND TAKE", "caption": ["Fast is useful —", "only when the frame is safe."], "durationSeconds": 6, "accent": "#8e9cff", "focusX": 0.35, "tags": ["multiline", "em-dash"] },
+    { "id": "v05", "title": "CENTER OF GRAVITY", "caption": ["Reframe the subject,", "not the compromise."], "durationSeconds": 9, "accent": "#d18cff", "focusX": 0.80, "tags": ["multiline", "portrait-reframe"] },
+    { "id": "v06", "title": "ROOM TONE", "caption": ["Silence carries the scene."], "durationSeconds": 7, "accent": "#5fd3ff", "focusX": 0.20, "tags": ["single-line"] },
+    { "id": "v07", "title": "LOCKED CUT", "caption": ["One edit plan.", "Two comparable renders."], "durationSeconds": 10, "accent": "#ff9f68", "focusX": 0.62, "tags": ["multiline", "locked-edit-plan"] },
+    { "id": "v08", "title": "DELIVERY WINDOW", "caption": ["Evidence before publish."], "durationSeconds": 8, "accent": "#9bea76", "focusX": 0.44, "tags": ["single-line", "delivery"] }
+  ]
+}

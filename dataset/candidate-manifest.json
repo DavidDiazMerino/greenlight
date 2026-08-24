@@ -1,0 +1,10 @@
+{
+  "candidate": "caption-compositor@0.2.0-rc1",
+  "baseline": "caption-compositor@0.1.0",
+  "component": "caption-compositor",
+  "affectedStages": ["portrait_reframe", "caption_layout", "render"],
+  "change": "Fuse portrait reframe, caption layout, and burn-in into one compositor pass.",
+  "knownDemoDefect": "For multiline captions, the release candidate derives block position in the 16:9 pre-transform coordinate space and maps that anchor into 9:16 after layout.",
+  "dataset": "vertical-social-v1",
+  "policy": "vertical-delivery-v1"
+}

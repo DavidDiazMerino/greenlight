@@ -1,0 +1,19 @@
+{
+  "name": "greenlight-agentic-cinema",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A deterministic, evidence-backed release gate for vertical-video post-production.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "install:local": "npm install --ignore-scripts",
+    "test": "node --experimental-strip-types --test --test-isolation=none test/*.test.ts",
+    "canary": "node --experimental-strip-types src/cli.ts canary",
+    "demo-fixture": "node --experimental-strip-types src/cli.ts demo-fixture",
+    "dev": "node --experimental-strip-types src/server.ts",
+    "build": "node --experimental-strip-types scripts/build.ts"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+artifacts/*
+!artifacts/.gitkeep
+assets/synthetic/generated/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
