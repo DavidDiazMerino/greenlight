@@ -14,11 +14,11 @@ Status markers: `PASS` is verified in the repository, `PARTIAL` needs live evide
 | Project was newly created during the contest period | First public commit is `80a46b5` on 2026-08-24; source records date from August 2026 | USER | Confirm Greenlight is original work first created after 2026-07-27. |
 | Team has at most four eligible people and every member is on Devpost | No team record in the repository | USER | Join the hackathon and add the final team/representative in Devpost. |
 | Functional web, Android, or iOS project | Local Decision Card and container smoke test are functional | PARTIAL | Deploy and record the public hosted URL. |
-| Functional production-ready AI agent or multi-agent network for a media/entertainment workflow | Deterministic experiment planner and policy exist, but no live Gemini/ADK run yet | PARTIAL | Import and call official Google ADK at runtime; capture a live run. |
-| Gemini and Google Cloud Agent Builder usage at runtime | Adapter boundary exists; no Google SDK was imported or called in the latest verified run | BLOCKED | Add `@google/adk`, authenticate a Google Cloud project, and retain real execution evidence. |
-| Grafana stack actively used at runtime primarily through official Grafana MCP | Strict adapter and negative guardrail exist; no MCP connection or receipt yet | BLOCKED | Connect ADK to the hosted or official self-hosted MCP server and call real Grafana tools. |
+| Functional production-ready AI agent or multi-agent network for a media/entertainment workflow | Reachable ADK Experiment and Grafana Evidence agents are locally integration-tested; no credentialed cloud capture yet | PARTIAL | Run `make agent-live` with the selected accounts and retain the live capture. |
+| Gemini and Google Cloud Agent Builder usage at runtime | `@google/adk` 2.0, `LlmAgent`, `Runner`, and the live Vertex entry point are implemented and tested without cloud secrets | BLOCKED | Authenticate the billing-enabled Google Cloud project and capture the real Vertex run. |
+| Grafana stack actively used at runtime primarily through official Grafana MCP | Hosted `MCPToolset`, OAuth 2.1, tool discovery, Prometheus/Loki/Tempo mission, raw results, and receipts are locally end-to-end tested | BLOCKED | Supply a Grafana Cloud stack/OTLP credentials and complete the one-time OAuth run. |
 | AI Observability is not presented as satisfying the Grafana requirement | Current docs already treat it as optional | PASS | Keep MCP calls as the primary evidence; add AI Observability only if time permits. |
-| Only Google Cloud AI and built-in partner AI are used | No OpenAI, Anthropic, AWS, or Microsoft AI dependency exists | PASS | Re-run the dependency/source audit before submission. |
+| Only Google Cloud AI and built-in partner AI are used | Runtime invokes only Vertex AI Gemini; the MCP protocol SDK used by Google ADK is transport, not a non-Google model or agent framework | PASS | Re-run the dependency/source audit before submission. |
 | Public source repository with detectable open-source license | `DavidDiazMerino/greenlight` is public and contains an MIT `LICENSE` | PASS | Keep repository public; verify GitHub still detects the license before submitting. |
 | Repository contains source, assets, and reproducible instructions | Synthetic geometry/text, generators, policy, tests, Dockerfile, and README are checked in | PASS | Add live integration and deployment instructions once verified. |
 | Hosted project URL | None | BLOCKED | Deploy after Google Cloud project selection and authentication. |
@@ -28,7 +28,7 @@ Status markers: `PASS` is verified in the repository, `PARTIAL` needs live evide
 
 ## Runtime proof that must exist in the final repository
 
-Devpost explicitly requires Google Cloud and partner services to be imported and actually called in code, not merely named in documentation. Greenlight therefore needs all of the following:
+Devpost explicitly requires Google Cloud and partner services to be imported and actually called in code, not merely named in documentation. Items 1–3 and 5 are implemented and locally integration-tested; items 4 and 6 still need live/user evidence:
 
 1. `@google/adk` in `package.json` and a reachable runtime entry point using `LlmAgent`/`Runner`.
 2. `MCPToolset` configured for the official Grafana MCP service.

@@ -11,7 +11,8 @@ RUN npm ci --ignore-scripts
 COPY . .
 ARG GREENLIGHT_GIT_COMMIT=container-build-unattributed
 ENV GREENLIGHT_GIT_COMMIT=$GREENLIGHT_GIT_COMMIT
-RUN npm test \
+RUN npm run typecheck \
+  && npm test \
   && npm run canary \
   && npm run build
 

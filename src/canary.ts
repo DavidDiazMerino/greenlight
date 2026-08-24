@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { copyFile, mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DeterministicExperimentPlanner } from "./adapters/gemini.ts";
+import { DeterministicExperimentPlanner, type ExperimentPlanner } from "./adapters/gemini.ts";
 import {
   assessEvidenceResilience,
   createCanaryPack,
@@ -52,7 +52,7 @@ function gitCommit(): string {
   return `${result.stdout.trim()}${status.status === 0 && status.stdout.trim() ? "-dirty" : ""}`;
 }
 
-export async function runCanary(): Promise<CanaryResult> {
+export async function runCanary(options: { planner?: ExperimentPlanner } = {}): Promise<CanaryResult> {
   assertFfmpegAvailable();
   const datasetPath = join(projectRoot, "dataset", "vertical-social-v1.json");
   const manifestPath = join(projectRoot, "dataset", "candidate-manifest.json");
@@ -75,7 +75,7 @@ export async function runCanary(): Promise<CanaryResult> {
   const originalsDir = join(projectRoot, "assets", "synthetic", "generated");
   await mkdir(mediaDir, { recursive: true });
 
-  const planner = new DeterministicExperimentPlanner();
+  const planner = options.planner ?? new DeterministicExperimentPlanner();
   const experimentSpec = await planner.plan({
     manifest,
     dataset,
@@ -323,7 +323,9 @@ export async function runCanary(): Promise<CanaryResult> {
     grafanaEvidenceRefs: [],
     traceIds: [heroBaseline.traceId, heroCandidate.traceId],
     gitCommit: gitCommit(),
-    geminiModel: "not-used — deterministic local Experiment Agent fallback",
+    geminiModel: "model" in planner && typeof planner.model === "string"
+      ? planner.model
+      : "not-used — deterministic local Experiment Agent fallback",
     replayCommand: "make canary",
     provenance: "local/synthetic",
     synthetic: true,

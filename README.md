@@ -28,12 +28,15 @@ The QA does not trust those declared coordinates. FFmpeg decodes a no-caption PN
 - FFmpeg and FFprobe with SVG, PNG, and H.264 support
 - A modern browser
 
+The optional live path additionally needs a billing-enabled Google Cloud project with Vertex AI credentials, a Grafana Cloud stack, and the OTLP endpoint/header values supplied by that stack.
+
 The local slice has no database, auth layer, or external media downloads. A checked-in container definition includes Node 24 and FFmpeg for reproducible local or Cloud Run deployment.
 
 ## Run it
 
 ```bash
 make install
+make typecheck
 make test
 make canary
 make build
@@ -56,6 +59,8 @@ Useful commands:
 
 - `make canary`: regenerate originals, render both variants, run QA/policy, and write evidence.
 - `make demo-fixture`: same deterministic local path, named for demo preparation.
+- `make agent-live`: run the real Vertex AI Gemini planner, export the canary through OTLP, authorize the hosted Grafana MCP service, and execute receipted Prometheus/Loki/Tempo tool calls.
+- `make typecheck`: compile-check the application, adapters, scripts, and tests without emitting files.
 - `make test`: verify provenance/fingerprints, evidence eligibility and suppression, policy non-override, receipt sensitivity, HOLD/PROMOTE/REJECT semantics, MCP guardrails, the layout defect, and experiment selection.
 - `make build`: copy the browser application to `dist/public`.
 - `make clean-generated`: remove only this project's generated `artifacts/` and `assets/synthetic/generated/` trees.
@@ -84,17 +89,24 @@ The evidence model uses categorical `verified`, `contradicted`, and `missing` su
 
 Recommendation eligibility is conservative. Missing authority, contradictory evidence, an inapplicable component/version/code path, incomplete paired reproduction, or incomplete Canary Pack coverage suppresses promotion and produces `HOLD — INSUFFICIENT EVIDENCE` when the delivery gates otherwise pass. A failed blocking invariant also remains `HOLD`; an AI-style suggested action is not an input with decision authority.
 
-Production/MCP-required mode is stricter. `provenance` must be `grafana-mcp`, and the bundle must contain valid receipts for metrics, logs, and traces; the trace receipt must carry a baseline/candidate pair. Missing receipts force exactly `HOLD — INSUFFICIENT EVIDENCE`. See [`docs/integrations.md`](docs/integrations.md).
+Production/MCP-required mode is stricter. `provenance` must be `grafana-mcp`, and the bundle must contain valid receipts for metrics, logs, and traces; the trace receipts must collectively carry a baseline/candidate pair. Missing receipts force exactly `HOLD — INSUFFICIENT EVIDENCE`. See [`docs/integrations.md`](docs/integrations.md).
 
-## What real Gemini/ADK and Grafana still require
+## Live Gemini/ADK + Grafana path
 
-The code includes replaceable, runtime-independent boundaries, not pretend integrations:
+The repository bundles `@google/adk`, the MCP SDK peer required by ADK, a reachable `LlmAgent`/`Runner` runtime, `MCPToolset`, OAuth 2.1/PKCE, OTLP export, runtime tool discovery, and exact-call receipts. The complete orchestration entry point is `make agent-live`; it fails before making claims when configuration, a required tool category, or a receipt is missing.
 
-- Grafana: connect an official Grafana MCP server through a real MCP client transport, discover its actual tools at runtime, explicitly bind advertised metric/log/trace tools, ingest real telemetry, and retain returned receipts.
-- Gemini/ADK: configure a Google Cloud project/location/model, install and authenticate Google ADK, implement the injected `GoogleAdkRuntime`, and verify the structured response. The local fallback selects all eight clips because caption layout is affected.
-- OpenTelemetry: supply a real HTTPS OTLP receiver/Collector endpoint and credentials, then verify metrics/logs/traces through the backend and MCP.
+Copy `.env.example` to an ignored `.env`, populate it from Google Cloud and the Grafana Cloud **OpenTelemetry → Send data** page, export those variables into the shell, then run:
 
-No OpenAI or Anthropic model/API is present in runtime code. Full boundaries and configuration gaps are in [`docs/integrations.md`](docs/integrations.md); verified versus unverified scope is in [`docs/implementation-status.md`](docs/implementation-status.md).
+```bash
+set -a
+source .env
+set +a
+make agent-live
+```
+
+The first run opens the hosted Grafana authorization page. OAuth tokens are kept outside the repository at `~/.config/greenlight/grafana-oauth.json` with mode `0600`; neither tokens nor OTLP headers are written into artifacts. The live capture is stored as `grafana-adk-run.json`, including the raw MCP results needed to verify each result hash, and a supplemental `decision-card.live.json`. Until a real run is completed, the checked-in/local Decision Card remains explicitly `local/synthetic`.
+
+No OpenAI or Anthropic model/API is invoked. `@modelcontextprotocol/sdk` is the transport peer used by Google ADK's official MCP integration; it is not used as an AI model or agent framework. Full boundaries and configuration gaps are in [`docs/integrations.md`](docs/integrations.md); verified versus unverified scope is in [`docs/implementation-status.md`](docs/implementation-status.md).
 
 ## Repository map
 

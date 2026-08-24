@@ -38,10 +38,7 @@ export class DeterministicExperimentPlanner implements ExperimentPlanner {
   }
 }
 
-/**
- * Boundary for a real Google ADK runtime. No SDK is bundled and the local demo
- * never calls this adapter. The injected runtime must return schema-valid JSON.
- */
+/** Boundary implemented by the bundled Google ADK runtime or a test double. */
 export interface GoogleAdkRuntime {
   runExperimentAgent(input: unknown): Promise<unknown>;
 }

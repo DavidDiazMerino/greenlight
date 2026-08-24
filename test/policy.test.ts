@@ -7,6 +7,8 @@ import { evaluatePolicy, loadPolicy } from "../src/policy.ts";
 import type { CanaryRun, CandidateManifest, Dataset, EvidenceBundle, EvidenceResilienceAssessment, MediaQaResult, Variant } from "../src/types.ts";
 import { projectRoot, readJson } from "../src/util.ts";
 
+const observedAt = "2026-08-24T00:00:00.000Z";
+
 async function fixture() {
   const dataset = await readJson<Dataset>(join(projectRoot, "dataset", "vertical-social-v1.json"));
   const manifest = await readJson<CandidateManifest>(join(projectRoot, "dataset", "candidate-manifest.json"));
@@ -156,6 +158,22 @@ test("an MCP-required path rejects local evidence without MCP receipts", async (
   assert.equal(result.decision, "HOLD");
   assert.equal(result.reason, "INSUFFICIENT_EVIDENCE");
   assert.match(result.evidenceCompleteness, /Grafana MCP/);
+});
+
+test("MCP-required evidence accepts a baseline/candidate trace pair across receipted Tempo calls", async () => {
+  const { policy } = await fixture();
+  const evidence = bundle(0);
+  evidence.provenance = "grafana-mcp";
+  evidence.synthetic = true;
+  evidence.localReceipt = null;
+  evidence.mcpReceipts = [
+    { receiptId: "metrics", kind: "metrics", serverIdentity: "grafana-test", toolName: "query_prometheus", query: {}, resultHash: "sha256:metrics", receivedAt: observedAt },
+    { receiptId: "logs", kind: "logs", serverIdentity: "grafana-test", toolName: "query_loki_logs", query: {}, resultHash: "sha256:logs", receivedAt: observedAt },
+    { receiptId: "trace-baseline", kind: "traces", serverIdentity: "grafana-test", toolName: "tempo_get_trace", query: {}, resultHash: "sha256:trace-baseline", receivedAt: observedAt, traceIds: ["0123456789abcdef0123456789abcdef"] },
+    { receiptId: "trace-candidate", kind: "traces", serverIdentity: "grafana-test", toolName: "tempo_get_trace", query: {}, resultHash: "sha256:trace-candidate", receivedAt: observedAt, traceIds: ["fedcba9876543210fedcba9876543210"] },
+  ];
+  const result = evaluatePolicy(evidence, policy, { requireMcp: true, resilience: eligibleResilience() });
+  assert.equal(result.decision, "PROMOTE");
 });
 
 test("rc1 coordinate transform places multiline blocks outside the safe area", async () => {

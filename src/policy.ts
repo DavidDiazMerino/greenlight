@@ -27,14 +27,15 @@ export async function loadPolicy(path: string): Promise<{ policy: Policy; hash: 
 }
 
 function validMcpReceipts(receipts: McpReceipt[], required: EvidenceKind[]): boolean {
-  return required.every((kind) => receipts.some((receipt) =>
+  const validByKind = required.every((kind) => receipts.some((receipt) =>
     receipt.kind === kind &&
     receipt.receiptId.length > 0 &&
     receipt.serverIdentity.length > 0 &&
     receipt.toolName.length > 0 &&
-    receipt.resultHash.startsWith("sha256:") &&
-    (kind !== "traces" || (receipt.traceIds?.length ?? 0) >= 2)
+    receipt.resultHash.startsWith("sha256:")
   ));
+  const pairedTraceIds = new Set(receipts.filter((receipt) => receipt.kind === "traces").flatMap((receipt) => receipt.traceIds ?? []));
+  return validByKind && (!required.includes("traces") || pairedTraceIds.size >= 2);
 }
 
 export function evaluatePolicy(

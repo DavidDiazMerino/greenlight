@@ -27,11 +27,14 @@ export class OtlpHttpExporter implements TelemetryExporter {
   private readonly endpoint: string;
   private readonly headers: Record<string, string>;
   constructor(endpoint: string, headers: Record<string, string> = {}) {
-    this.endpoint = endpoint;
-    this.headers = headers;
-    if (!endpoint.startsWith("https://") && !endpoint.startsWith("http://localhost")) {
-      throw new Error("OTLP endpoint must use HTTPS (or localhost for development)");
+    const parsed = new URL(endpoint);
+    const localHttp = parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1");
+    if ((parsed.protocol !== "https:" && !localHttp) || parsed.username || parsed.password) {
+      throw new Error("OTLP endpoint must use HTTPS without embedded credentials (HTTP is allowed only for localhost)");
     }
+    if (parsed.search || parsed.hash) throw new Error("OTLP endpoint must not contain a query string or fragment");
+    this.endpoint = parsed.toString().replace(/\/$/, "");
+    this.headers = headers;
   }
 
   async export(snapshot: TelemetrySnapshot): Promise<void> {
@@ -56,11 +59,11 @@ function attrs(values: Record<string, unknown>) {
 }
 
 function toOtlpSpans(spans: Span[]) {
-  return [{ resource: { attributes: attrs({ "service.name": "greenlight-canary" }) }, scopeSpans: [{ scope: { name: "greenlight" }, spans: spans.map((span) => ({ traceId: span.traceId, spanId: span.spanId, parentSpanId: span.parentSpanId, name: span.name, startTimeUnixNano: String(span.startUnixMs * 1_000_000), endTimeUnixNano: String(span.endUnixMs * 1_000_000), attributes: attrs(span.attributes) })) }] }];
+  return [{ resource: { attributes: attrs({ "service.name": "greenlight-canary" }) }, scopeSpans: [{ scope: { name: "greenlight" }, spans: spans.map((span) => ({ traceId: span.traceId, spanId: span.spanId, parentSpanId: span.parentSpanId, name: span.name, startTimeUnixNano: String(BigInt(span.startUnixMs) * 1_000_000n), endTimeUnixNano: String(BigInt(span.endUnixMs) * 1_000_000n), attributes: attrs(span.attributes) })) }] }];
 }
 
 function toOtlpLogs(logs: LocalLog[]) {
-  return [{ resource: { attributes: attrs({ "service.name": "greenlight-canary" }) }, scopeLogs: [{ scope: { name: "greenlight" }, logRecords: logs.map((log) => ({ timeUnixNano: String(Date.parse(log.timestamp) * 1_000_000), severityText: log.violation_px > 0 ? "ERROR" : "INFO", body: { stringValue: JSON.stringify(log) }, attributes: attrs(log) })) }] }];
+  return [{ resource: { attributes: attrs({ "service.name": "greenlight-canary" }) }, scopeLogs: [{ scope: { name: "greenlight" }, logRecords: logs.map((log) => ({ timeUnixNano: String(BigInt(Date.parse(log.timestamp)) * 1_000_000n), severityText: log.violation_px > 0 ? "ERROR" : "INFO", body: { stringValue: JSON.stringify(log) }, attributes: attrs({ ...log }) })) }] }];
 }
 
 function toOtlpMetrics(metrics: MediaQaResult[]) {
@@ -71,5 +74,6 @@ function toOtlpMetrics(metrics: MediaQaResult[]) {
     ["greenlight_caption_safe_area_violation_px", (m) => m.violationPx],
     ["greenlight_run_completed", (m) => Number(m.runCompleted)],
   ];
-  return [{ resource: { attributes: attrs({ "service.name": "greenlight-canary" }) }, scopeMetrics: [{ scope: { name: "greenlight" }, metrics: names.map(([name, get]) => ({ name, gauge: { dataPoints: metrics.map((metric) => ({ attributes: attrs({ variant: metric.variant, clip_id: metric.clipId, experiment_id: metric.experimentId }), asDouble: get(metric), timeUnixNano: String(Date.now() * 1_000_000) })) } })) }] }];
+  const timeUnixNano = String(BigInt(Date.now()) * 1_000_000n);
+  return [{ resource: { attributes: attrs({ "service.name": "greenlight-canary" }) }, scopeMetrics: [{ scope: { name: "greenlight" }, metrics: names.map(([name, get]) => ({ name, gauge: { dataPoints: metrics.map((metric) => ({ attributes: attrs({ variant: metric.variant, clip_id: metric.clipId, experiment_id: metric.experimentId }), asDouble: get(metric), timeUnixNano })) } })) }] }];
 }

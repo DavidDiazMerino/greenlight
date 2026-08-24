@@ -10,10 +10,23 @@
   },
   "scripts": {
     "install:local": "npm install --ignore-scripts",
+    "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test --test-isolation=none test/*.test.ts",
     "canary": "node --experimental-strip-types src/cli.ts canary",
+    "agent:live": "node --experimental-strip-types src/cli.ts agent-live",
     "demo-fixture": "node --experimental-strip-types src/cli.ts demo-fixture",
     "dev": "node --experimental-strip-types src/server.ts",
     "build": "node --experimental-strip-types scripts/build.ts"
+  },
+  "dependencies": {
+    "@google/adk": "^2.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  },
+  "overrides": {
+    "adm-zip": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "^5.9.3"
   }
 }
