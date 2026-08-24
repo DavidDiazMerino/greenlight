@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { projectRoot } from "./util.ts";
 
 const port = Number(process.env.PORT ?? 4173);
+const host = process.env.HOST ?? "127.0.0.1";
 const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -27,6 +28,11 @@ export function resolveRequest(url: string, roots: { project: string; web: strin
 export function createGreenlightServer(roots = { project: projectRoot, web: join(projectRoot, "src", "web") }) {
   return createServer(async (request, response) => {
     try {
+      if (request.url === "/healthz") {
+        response.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        response.end('{"status":"ok"}\n');
+        return;
+      }
       const path = resolveRequest(request.url ?? "/", roots);
       if (!path || !(await stat(path)).isFile()) throw new Error("not found");
       response.writeHead(200, {
@@ -43,7 +49,7 @@ export function createGreenlightServer(roots = { project: projectRoot, web: join
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  createGreenlightServer().listen(port, "127.0.0.1", () => {
-    process.stdout.write(`Greenlight Decision Card: http://127.0.0.1:${port}\n`);
+  createGreenlightServer().listen(port, host, () => {
+    process.stdout.write(`Greenlight Decision Card listening on ${host}:${port}\n`);
   });
 }

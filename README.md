@@ -24,11 +24,11 @@ The QA does not trust those declared coordinates. FFmpeg decodes a no-caption PN
 
 ## Requirements
 
-- Node.js 22.18+ (tested with the installed Node 24 runtime; native TypeScript stripping is used)
+- Node.js 22.18+ (tested with Node 24; native TypeScript stripping is used)
 - FFmpeg and FFprobe with SVG, PNG, and H.264 support
 - A modern browser
 
-There are no runtime npm dependencies, database, auth layer, Docker image, or external media downloads.
+The local slice has no database, auth layer, or external media downloads. A checked-in container definition includes Node 24 and FFmpeg for reproducible local or Cloud Run deployment.
 
 ## Run it
 
@@ -41,6 +41,16 @@ make dev
 ```
 
 Open `http://127.0.0.1:4173`. The canary writes its exact measurements under `artifacts/gl-local-*/` and refreshes `artifacts/latest/`. The runner emits real H.264 MP4s; it is not a still-only fallback.
+
+To exercise the same build in a container:
+
+```bash
+docker build --build-arg GREENLIGHT_GIT_COMMIT="$(git rev-parse HEAD)" -t greenlight:local .
+docker run --rm -p 8080:8080 greenlight:local
+curl --fail http://127.0.0.1:8080/healthz
+```
+
+Once `gcloud` is authenticated to a billing-enabled project, the same Dockerfile can be deployed from the repository root with `gcloud run deploy greenlight --source . --region europe-west1 --allow-unauthenticated`. Cloud Run supplies `PORT`; the container listens on `0.0.0.0`.
 
 Useful commands:
 
@@ -101,6 +111,8 @@ docs/          integration contract and implementation status
 ```
 
 The domain contracts and fingerprint boundaries are documented in [`docs/evidence-model.md`](docs/evidence-model.md).
+
+The live contest requirements and current pass/blocker matrix are tracked in [`docs/hackathon-compliance.md`](docs/hackathon-compliance.md).
 
 ## License
 

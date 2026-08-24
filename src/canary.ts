@@ -44,6 +44,8 @@ async function artifactIndex(root: string, current = root): Promise<Array<{ path
 }
 
 function gitCommit(): string {
+  const injected = process.env.GREENLIGHT_GIT_COMMIT?.trim();
+  if (injected) return injected;
   const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: projectRoot, encoding: "utf8" });
   if (result.status !== 0) return "uncommitted-local-worktree";
   const status = spawnSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd: projectRoot, encoding: "utf8" });
