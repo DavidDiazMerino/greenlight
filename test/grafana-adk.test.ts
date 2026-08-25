@@ -6,7 +6,7 @@ import { BaseLlm, getLogger, setLogger, type BaseLlmConnection, type LlmResponse
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { classifyGrafanaTool, createGrafanaCloudMcpToolset, runGrafanaEvidenceAgent } from "../src/adapters/grafana-adk.ts";
+import { classifyGrafanaTool, createGrafanaCloudMcpToolset, grafanaResultHasData, runGrafanaEvidenceAgent } from "../src/adapters/grafana-adk.ts";
 
 const toolNames = ["query_prometheus", "query_loki_logs", "tempo_traceql_search"];
 const baselineTraceId = "0123456789abcdef0123456789abcdef";
@@ -57,8 +57,8 @@ function fakeGrafanaServer() {
       content: [{
         type: "text",
         text: JSON.stringify(request.params.name.includes("tempo")
-          ? { traceID: baselineTraceId, nested: { traceId: candidateTraceId }, query: request.params.arguments }
-          : { rows: 1, query: request.params.arguments }),
+          ? { traces: [{ traceID: baselineTraceId, nested: { traceId: candidateTraceId } }], query: request.params.arguments }
+          : { data: [{ rows: 1 }], query: request.params.arguments }),
       }],
       structuredContent: request.params.name.includes("tempo")
         ? { traceId: baselineTraceId }
@@ -99,9 +99,15 @@ test("Google ADK discovers and calls metric, log, and trace tools through Stream
         immutableVerdict: { decision: "HOLD" },
         window: { from: "2026-08-24T00:00:00.000Z", to: "2026-08-24T00:05:00.000Z" },
         localSummary: { candidateFailures: 5 },
+        queryPlan: toolNames.map((toolName) => ({
+          kind: classifyGrafanaTool(toolName)!,
+          toolName,
+          args: { query: `experiment_id=exp-test kind=${toolName}` },
+        })),
       },
     });
     assert.deepEqual(result.receipts.map((receipt) => receipt.kind).sort(), ["logs", "metrics", "traces"]);
+    assert.ok(result.receipts.every((receipt) => receipt.dataPresent));
     assert.deepEqual(result.receipts.find((receipt) => receipt.kind === "traces")?.traceIds, [baselineTraceId, candidateTraceId].sort());
     assert.equal(result.narrative.diagnosis, "The candidate crosses the safe area.");
     assert.equal(fake.routedStack(), "https://greenlight-test.grafana.net");
@@ -117,6 +123,13 @@ test("Grafana MCP tool classification is explicit and unknown tools stay unrecei
   assert.equal(classifyGrafanaTool("query_loki_logs"), "logs");
   assert.equal(classifyGrafanaTool("tempo_get_trace"), "traces");
   assert.equal(classifyGrafanaTool("generate_deeplink"), null);
+});
+
+test("Grafana evidence only counts non-empty backend result arrays", () => {
+  assert.equal(grafanaResultHasData("metrics", { content: [{ text: '{"data":[{"values":[[1,"2"]]}]}' }] }), true);
+  assert.equal(grafanaResultHasData("logs", { content: [{ text: '{"data":[]}' }] }), false);
+  assert.equal(grafanaResultHasData("traces", { content: [{ text: '{"traces":[{"traceID":"abc"}]}' }] }), true);
+  assert.equal(grafanaResultHasData("traces", { content: [{ text: '{"traces":[]}' }] }), false);
 });
 
 test("Grafana stack routing rejects non-Grafana and credential-bearing URLs", () => {

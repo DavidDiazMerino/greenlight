@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { loadLiveConfig } from "../src/live.ts";
 
 const valid = {
-  GOOGLE_GENAI_USE_VERTEXAI: "true",
+  GOOGLE_GENAI_USE_ENTERPRISE: "true",
   GOOGLE_CLOUD_PROJECT: "greenlight-test",
   GOOGLE_CLOUD_LOCATION: "europe-west1",
   GEMINI_MODEL: "gemini-2.5-flash",
@@ -20,7 +20,7 @@ test("live config requires Vertex AI and parses standard OTLP headers without lo
 });
 
 test("live config fails before work when cloud or secret settings are incomplete", () => {
-  assert.throws(() => loadLiveConfig({ ...valid, GOOGLE_GENAI_USE_VERTEXAI: "false" }), /Vertex AI/);
+  assert.throws(() => loadLiveConfig({ ...valid, GOOGLE_GENAI_USE_ENTERPRISE: "false" }), /Vertex AI/);
   assert.throws(() => loadLiveConfig({ ...valid, OTEL_EXPORTER_OTLP_HEADERS: "not-a-header" }), /key=value/);
   assert.throws(() => loadLiveConfig({ ...valid, GOOGLE_CLOUD_PROJECT: "" }), /GOOGLE_CLOUD_PROJECT/);
   assert.throws(() => loadLiveConfig({ ...valid, GRAFANA_URL: "https://example.com" }), /GRAFANA_URL/);

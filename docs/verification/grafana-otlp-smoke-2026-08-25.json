@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "GrafanaOtlpSmokeVerification",
+  "executedAt": "2026-08-25T09:52:39.000Z",
+  "environment": {
+    "stackSlug": "merryboxwood1367",
+    "stackRegion": "prod-eu-west-2",
+    "transport": "OTLP/HTTP JSON",
+    "signal": "traces"
+  },
+  "request": {
+    "serviceName": "greenlight-canary",
+    "spanName": "greenlight.otel.auth.smoke",
+    "synthetic": true
+  },
+  "transportResult": {
+    "httpStatus": 200,
+    "accepted": true
+  },
+  "grafanaUiVerification": {
+    "surface": "Traces Drilldown",
+    "timeRange": "Last 1 hour",
+    "matchingTraceCount": 1,
+    "serviceName": "greenlight-canary",
+    "spanName": "greenlight.otel.auth.smoke",
+    "durationMs": 1,
+    "visibleErrors": 0,
+    "verifiedBy": "operator"
+  },
+  "credentialHandling": {
+    "tokenRecorded": false,
+    "authorizationHeaderRecorded": false,
+    "repositoryEnvFileIgnored": true
+  }
+}

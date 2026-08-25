@@ -13,14 +13,15 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test --test-isolation=none test/*.test.ts",
     "canary": "node --experimental-strip-types src/cli.ts canary",
-    "agent:live": "node --experimental-strip-types src/cli.ts agent-live",
+    "agent:live": "node --env-file=.env --experimental-strip-types src/cli.ts agent-live",
     "demo-fixture": "node --experimental-strip-types src/cli.ts demo-fixture",
     "dev": "node --experimental-strip-types src/server.ts",
     "build": "node --experimental-strip-types scripts/build.ts"
   },
   "dependencies": {
     "@google/adk": "^2.0.0",
-    "@modelcontextprotocol/sdk": "^1.30.0"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
   },
   "overrides": {
     "adm-zip": "^0.6.0"

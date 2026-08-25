@@ -47,10 +47,16 @@ export interface ExperimentSpec {
   baselineDigest: string;
   candidateDigest: string;
   affectedStages: string[];
+  proposedClipIds: string[];
   clipIds: string[];
   policyHash: string;
   requiredEvidence: EvidenceKind[];
   planner: "deterministic-local" | "gemini-adk";
+  coverageGuard: {
+    strategy: "deterministic-affected-stage-floor";
+    requiredClipIds: string[];
+    addedClipIds: string[];
+  };
 }
 
 export interface MediaQaResult {
@@ -107,6 +113,7 @@ export interface McpReceipt {
   query: unknown;
   resultHash: string;
   receivedAt: string;
+  dataPresent?: boolean;
   traceIds?: string[];
 }
 

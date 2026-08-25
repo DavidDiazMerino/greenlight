@@ -26,6 +26,11 @@ export interface GrafanaEvidenceMission {
   immutableVerdict: unknown;
   window: { from: string; to: string };
   localSummary: unknown;
+  queryPlan: Array<{
+    kind: EvidenceKind;
+    toolName: string;
+    args: Record<string, unknown>;
+  }>;
 }
 
 export interface GrafanaEvidenceAgentResult {
@@ -44,11 +49,11 @@ export interface GrafanaEvidenceAgentResult {
 const EVIDENCE_AGENT_INSTRUCTION = [
   "You are Greenlight's Grafana Evidence Agent for a vertical-video release gate.",
   "Use the advertised Grafana MCP tools; do not invent tool names or results.",
-  "Call at least one Prometheus query tool for metrics, one Loki query tool for logs, and one Tempo tool for traces.",
-  "Scope every query to the supplied experimentId and time window whenever the tool schema permits it.",
+  "Execute every call in queryPlan exactly once, using the supplied toolName and args verbatim.",
+  "Do not call discovery tools, change expressions, add filters, or make any call outside queryPlan.",
   "Correlate baseline and candidate using experiment_id, clip_id, variant, and trace IDs.",
   "The deterministic verdict supplied by the operator is immutable. Never alter thresholds or the verdict.",
-  "After the three evidence categories have been queried, return JSON only with string fields diagnosis and recommendedAction.",
+  "After all planned calls succeed, return JSON only with string fields diagnosis and recommendedAction.",
 ].join(" ");
 
 export function createGrafanaCloudMcpToolset(config: GrafanaAdkMcpConfig): MCPToolset {
@@ -82,6 +87,19 @@ export async function runGrafanaEvidenceAgent(options: {
 
   const receipts: McpReceipt[] = [];
   const calls: Array<McpReceipt & { result: unknown }> = [];
+  const expectedCalls = new Map<string, number>();
+  for (const planned of options.mission.queryPlan) {
+    if (!discoveredTools.includes(planned.toolName)) throw new Error(`Grafana MCP did not advertise planned tool: ${planned.toolName}`);
+    if (classifyGrafanaTool(planned.toolName) !== planned.kind) throw new Error(`Grafana query plan kind does not match tool: ${planned.toolName}`);
+    const key = plannedCallKey(planned.toolName, planned.args);
+    expectedCalls.set(key, (expectedCalls.get(key) ?? 0) + 1);
+  }
+  for (const required of ["metrics", "logs", "traces"] as const) {
+    if (!options.mission.queryPlan.some((planned) => planned.kind === required)) {
+      throw new Error(`Grafana query plan has no ${required} call`);
+    }
+  }
+  const observedCalls = new Map<string, number>();
   const agent = new LlmAgent({
     name: "greenlight_grafana_evidence_agent",
     description: "Queries receipted Grafana metrics, logs, and traces before explaining a fixed release verdict",
@@ -91,8 +109,14 @@ export async function runGrafanaEvidenceAgent(options: {
     tools: [options.toolset],
     generateContentConfig: { temperature: 0 },
     afterToolCallback: ({ tool, args, response }) => {
+      const callKey = plannedCallKey(tool.name, args);
+      const observed = (observedCalls.get(callKey) ?? 0) + 1;
+      if (observed > (expectedCalls.get(callKey) ?? 0)) {
+        throw new Error(`Grafana Evidence Agent made an unplanned MCP call: ${tool.name}`);
+      }
+      observedCalls.set(callKey, observed);
       const kind = classifyGrafanaTool(tool.name);
-      if (!kind) return undefined;
+      if (!kind) throw new Error(`Grafana Evidence Agent called an unclassified planned tool: ${tool.name}`);
       const resultHash = fingerprint(response);
       const receipt: McpReceipt = {
         receiptId: stableId(options.serverIdentity, tool.name, JSON.stringify(args), resultHash),
@@ -102,6 +126,7 @@ export async function runGrafanaEvidenceAgent(options: {
         query: args,
         resultHash,
         receivedAt: new Date().toISOString(),
+        dataPresent: grafanaResultHasData(kind, response),
         traceIds: kind === "traces" ? collectTraceIds(response) : undefined,
       };
       receipts.push(receipt);
@@ -130,9 +155,14 @@ export async function runGrafanaEvidenceAgent(options: {
     await options.toolset.close();
   }
 
+  if (receipts.length !== options.mission.queryPlan.length) {
+    throw new Error(`Grafana Evidence Agent completed ${receipts.length}/${options.mission.queryPlan.length} planned MCP calls`);
+  }
+  const emptyReceipt = receipts.find((receipt) => !receipt.dataPresent);
+  if (emptyReceipt) throw new Error(`Grafana Evidence Agent received empty evidence from ${emptyReceipt.toolName}`);
   for (const required of ["metrics", "logs", "traces"] as const) {
-    if (!receipts.some((receipt) => receipt.kind === required)) {
-      throw new Error(`Grafana Evidence Agent completed without a receipted ${required} MCP call`);
+    if (!receipts.some((receipt) => receipt.kind === required && receipt.dataPresent)) {
+      throw new Error(`Grafana Evidence Agent completed without non-empty ${required} MCP evidence`);
     }
   }
   const narrative = validateNarrative(parseAdkJsonResponse(finalText));
@@ -149,6 +179,35 @@ export async function runGrafanaEvidenceAgent(options: {
     receipts,
     calls,
   };
+}
+
+function plannedCallKey(toolName: string, args: unknown): string {
+  return `${toolName}:${fingerprint(args)}`;
+}
+
+export function grafanaResultHasData(kind: EvidenceKind, value: unknown): boolean {
+  let present = false;
+  const visit = (item: unknown): void => {
+    if (present) return;
+    if (typeof item === "string" && /^[\[{]/.test(item.trim())) {
+      try { visit(JSON.parse(item)); } catch { /* MCP text content is not always JSON. */ }
+      return;
+    }
+    if (Array.isArray(item)) {
+      item.forEach(visit);
+      return;
+    }
+    if (!item || typeof item !== "object") return;
+    const record = item as Record<string, unknown>;
+    const resultKey = kind === "traces" ? "traces" : "data";
+    if (Array.isArray(record[resultKey]) && record[resultKey].length > 0) {
+      present = true;
+      return;
+    }
+    Object.values(record).forEach(visit);
+  };
+  visit(value);
+  return present;
 }
 
 export function classifyGrafanaTool(name: string): EvidenceKind | null {

@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "GreenlightLiveAdkGrafanaMcpVerification",
+  "experimentId": "gl-local-c622bbb0e382",
+  "startedAt": "2026-08-25T11:43:58.269Z",
+  "completedAt": "2026-08-25T11:44:36.251Z",
+  "runtime": {
+    "googleCloudProject": "greenlight-agentic-cinema",
+    "googleCloudLocation": "global",
+    "model": "gemini-2.5-flash",
+    "agentFramework": "@google/adk",
+    "grafanaMcpEndpoint": "https://mcp.grafana.com/mcp",
+    "grafanaStackHost": "merryboxwood1367.grafana.net",
+    "mcpTransport": "Streamable HTTP",
+    "mcpAuthentication": "OAuth 2.1/PKCE",
+    "discoveredToolCount": 118
+  },
+  "telemetry": {
+    "transport": "OTLP/HTTP JSON",
+    "signalsExported": ["metrics", "logs", "traces"],
+    "serviceName": "greenlight-canary",
+    "synthetic": true
+  },
+  "mcpCalls": [
+    {
+      "kind": "metrics",
+      "toolName": "query_prometheus",
+      "query": "avg(greenlight_render_duration_ms{experiment_id=\"gl-local-c622bbb0e382\", variant=\"baseline\"})",
+      "dataPresent": true,
+      "seriesReturned": 1,
+      "observedAverageMs": 1260.475,
+      "receiptId": "d0d22a73375d8e758dbd1b9bf9b6f2c80fff92bc430310157bf230a653f4169c",
+      "resultHash": "sha256:3e189fd84e93f3780bcb71850779cf38f3ef16133b4e059c1b7d04cbc88ea57e"
+    },
+    {
+      "kind": "metrics",
+      "toolName": "query_prometheus",
+      "query": "avg(greenlight_render_duration_ms{experiment_id=\"gl-local-c622bbb0e382\", variant=\"candidate\"})",
+      "dataPresent": true,
+      "seriesReturned": 1,
+      "observedAverageMs": 1107.325,
+      "receiptId": "8ede14291a20f3ebbcfba28444bce74e0750c81e872eb351c3589aa978d3ff72",
+      "resultHash": "sha256:78a8a1c5d6671d40a19a144dc94e83827be3129ff468692771531880dba9bc6f"
+    },
+    {
+      "kind": "logs",
+      "toolName": "query_loki_logs",
+      "query": "{service_name=\"greenlight-canary\"} | json | experiment_id = \"gl-local-c622bbb0e382\"",
+      "dataPresent": true,
+      "entriesReturned": 10,
+      "baselineEntriesReturned": 5,
+      "candidateEntriesReturned": 5,
+      "receiptId": "b1b2ad47c028f933a76a7975c9c6f043609b125ed7cde0b0c26b7f34d946b520",
+      "resultHash": "sha256:afe0af9eeecf9d616dee1a91c6cb112545a56a92f47d464c74c7fb96a14be2d7"
+    },
+    {
+      "kind": "traces",
+      "toolName": "tempo_traceql-search",
+      "query": "{ resource.service.name = \"greenlight-canary\" && span.experiment_id = \"gl-local-c622bbb0e382\" }",
+      "dataPresent": true,
+      "tracesReturned": 3,
+      "pairedBaselineCandidateClip": "v01",
+      "receiptId": "dc86fde343daa22c4e1fc48a196e90646ed7e1760f8f06b52758de266b579512",
+      "resultHash": "sha256:041a8fc2c7b683e1408e37d0e888a9b13ab64751856351032b3ff183d4359d62"
+    }
+  ],
+  "decision": {
+    "owner": "deterministic-policy-evaluator",
+    "verdict": "HOLD",
+    "reason": "GATE_FAILED",
+    "deploymentBlocked": true,
+    "runCoverage": 16,
+    "candidateSafeAreaPassRate": 0.375,
+    "candidateFailures": 5,
+    "maximumViolationPx": 61,
+    "blockingInvariantId": "caption-safe-area-9x16",
+    "verdictChangedByAgent": false,
+    "decisionReceiptFingerprint": "sha256:789bf5e4da7f9957c219012181c0ade60fd478ce9260a38f052d9bbcb815cb08"
+  },
+  "credentialHandling": {
+    "oauthTokenRecorded": false,
+    "otlpAuthorizationHeaderRecorded": false,
+    "repositoryEnvFileIgnored": true,
+    "oauthStateStoredOutsideRepository": true
+  }
+}

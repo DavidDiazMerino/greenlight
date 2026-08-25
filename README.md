@@ -4,7 +4,7 @@
 
 Greenlight is an evidence-backed release gate for post-production teams delivering vertical social video. It turns a repository-owned candidate change into provenance-grounded evidence, tests a versioned eight-clip Canary Pack, measures the pixels actually burned into the final 9:16 output, applies a committed delivery policy, and renders one auditable Decision Card.
 
-This repository contains a complete, honest local vertical slice. Its generated evidence is labelled `local/synthetic`; it does **not** claim that Grafana MCP, Gemini, Google ADK, or cloud services were called.
+This repository contains a complete local vertical slice whose generated evidence is honestly labelled `local/synthetic`. It also contains a credential-free verification record for a real Vertex AI Gemini + Google ADK + Grafana Cloud MCP execution; that external execution does not turn synthetic canary data into production data.
 
 ## What the demo proves
 
@@ -104,7 +104,7 @@ set +a
 make agent-live
 ```
 
-The first run opens the hosted Grafana authorization page. OAuth tokens are kept outside the repository at `~/.config/greenlight/grafana-oauth.json` with mode `0600`; neither tokens nor OTLP headers are written into artifacts. The live capture is stored as `grafana-adk-run.json`, including the raw MCP results needed to verify each result hash, and a supplemental `decision-card.live.json`. Until a real run is completed, the checked-in/local Decision Card remains explicitly `local/synthetic`.
+The first run opens the hosted Grafana authorization page. OAuth tokens are kept outside the repository at `~/.config/greenlight/grafana-oauth.json` with mode `0600`; neither tokens nor OTLP headers are written into artifacts. The live capture is stored locally as ignored `grafana-adk-run.json`, including the raw MCP results needed to verify each result hash, and a supplemental `decision-card.live.json`. The credential-free record of the verified 2026-08-25 run is [`docs/verification/live-adk-grafana-mcp-2026-08-25.json`](docs/verification/live-adk-grafana-mcp-2026-08-25.json). The checked-in/local Decision Card remains explicitly `local/synthetic`.
 
 No OpenAI or Anthropic model/API is invoked. `@modelcontextprotocol/sdk` is the transport peer used by Google ADK's official MCP integration; it is not used as an AI model or agent framework. Full boundaries and configuration gaps are in [`docs/integrations.md`](docs/integrations.md); verified versus unverified scope is in [`docs/implementation-status.md`](docs/implementation-status.md).
 

@@ -6,7 +6,9 @@ import {
   isFinalResponse,
   stringifyContent,
   type BeforeModelCallback,
+  type LlmAgentSchema,
 } from "@google/adk";
+import { z } from "zod";
 import type { GoogleAdkDecisionRuntime, GoogleAdkRuntime } from "./gemini.ts";
 
 export interface GoogleAdkAgentRuntimeOptions {
@@ -20,6 +22,7 @@ const EXPERIMENT_AGENT_INSTRUCTION = [
   "You are Greenlight's Experiment Agent for a vertical-video post-production release gate.",
   "Return one JSON object only.",
   "Select canary clipIds that exercise the affected stages.",
+  "Treat coverageContract.requiredClipIds as a mandatory floor: copy every required ID and never reduce locked canary coverage.",
   "Copy policyHash exactly. Never change policy thresholds, required evidence, component versions, or digests.",
   "The deterministic policy evaluator, not this agent, owns the final release verdict.",
 ].join(" ");
@@ -31,6 +34,16 @@ const DECISION_AGENT_INSTRUCTION = [
   "Explain the measured cause and propose a replayable corrective action.",
   "Never alter, reinterpret, or override the immutable verdict or thresholds.",
 ].join(" ");
+
+const EXPERIMENT_OUTPUT_SCHEMA = z.object({
+  clipIds: z.array(z.string()).min(1),
+  policyHash: z.string().min(1),
+}).strict();
+
+const DECISION_OUTPUT_SCHEMA = z.object({
+  diagnosis: z.string().min(1),
+  recommendedAction: z.string().min(1),
+}).strict();
 
 /**
  * Real Google Agent Development Kit runtime. The optional model callback exists
@@ -52,14 +65,14 @@ export class GoogleAdkAgentRuntime implements GoogleAdkRuntime, GoogleAdkDecisio
   }
 
   runExperimentAgent(input: unknown): Promise<unknown> {
-    return this.runJsonAgent("greenlight_experiment_agent", EXPERIMENT_AGENT_INSTRUCTION, input);
+    return this.runJsonAgent("greenlight_experiment_agent", EXPERIMENT_AGENT_INSTRUCTION, input, EXPERIMENT_OUTPUT_SCHEMA);
   }
 
   explainDecision(input: unknown): Promise<unknown> {
-    return this.runJsonAgent("greenlight_decision_agent", DECISION_AGENT_INSTRUCTION, input);
+    return this.runJsonAgent("greenlight_decision_agent", DECISION_AGENT_INSTRUCTION, input, DECISION_OUTPUT_SCHEMA);
   }
 
-  private async runJsonAgent(name: string, instruction: string, input: unknown): Promise<unknown> {
+  private async runJsonAgent(name: string, instruction: string, input: unknown, outputSchema: LlmAgentSchema): Promise<unknown> {
     const agent = new LlmAgent({
       name,
       description: "Greenlight structured agent powered by Gemini on Google Cloud",
@@ -70,6 +83,7 @@ export class GoogleAdkAgentRuntime implements GoogleAdkRuntime, GoogleAdkDecisio
         temperature: 0,
         responseMimeType: "application/json",
       },
+      outputSchema,
       beforeModelCallback: this.beforeModelCallback,
     });
     const runner = new Runner({

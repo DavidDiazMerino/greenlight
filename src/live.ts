@@ -27,8 +27,8 @@ export function loadLiveConfig(env: NodeJS.ProcessEnv = process.env): LiveConfig
     if (!value) throw new Error(`Missing required live integration setting: ${name}`);
     return value;
   };
-  if (env.GOOGLE_GENAI_USE_VERTEXAI?.toLowerCase() !== "true") {
-    throw new Error("GOOGLE_GENAI_USE_VERTEXAI=true is required so Gemini runs through Google Cloud Vertex AI");
+  if (env.GOOGLE_GENAI_USE_ENTERPRISE?.toLowerCase() !== "true") {
+    throw new Error("GOOGLE_GENAI_USE_ENTERPRISE=true is required so Gemini runs through Google Cloud Vertex AI");
   }
   const rawWait = Number(env.GREENLIGHT_GRAFANA_INGEST_WAIT_MS ?? 10_000);
   if (!Number.isFinite(rawWait) || rawWait < 0 || rawWait > 60_000) {
@@ -78,6 +78,11 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
   await authorizeGrafanaMcp({ provider: oauthProvider, serverUrl: config.mcpEndpoint });
   const serverIdentity = `${config.mcpEndpoint}#${new URL(stackOrigin).hostname}`;
   const timestamps = canary.evidenceBundle.traces.flatMap((trace) => [trace.startUnixMs, trace.endUnixMs]);
+  const window = {
+    from: new Date(Math.min(...timestamps) - 60_000).toISOString(),
+    to: new Date(Math.max(...timestamps) + 120_000).toISOString(),
+  };
+  const experimentSelector = JSON.stringify(canary.experimentId);
   const result = await runGrafanaEvidenceAgent({
     model: config.model,
     toolset,
@@ -90,16 +95,59 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
         reason: canary.decisionCard.reason,
         policyHash: canary.decisionCard.policyHash,
       },
-      window: {
-        from: new Date(Math.min(...timestamps) - 60_000).toISOString(),
-        to: new Date(Math.max(...timestamps) + 120_000).toISOString(),
-      },
+      window,
       localSummary: {
         candidateFailures: canary.evidenceBundle.metrics.filter((item) => item.variant === "candidate" && !item.safeAreaPass).length,
         maximumViolationPx: Math.max(...canary.evidenceBundle.metrics.map((item) => item.violationPx)),
         baselineTraceIds: canary.evidenceBundle.metrics.filter((item) => item.variant === "baseline").map((item) => item.traceId),
         candidateTraceIds: canary.evidenceBundle.metrics.filter((item) => item.variant === "candidate").map((item) => item.traceId),
       },
+      queryPlan: [
+        {
+          kind: "metrics",
+          toolName: "query_prometheus",
+          args: {
+            datasourceUid: "grafanacloud-prom",
+            expr: `avg(greenlight_render_duration_ms{experiment_id=${experimentSelector}, variant="baseline"})`,
+            startTime: window.from,
+            endTime: window.to,
+            stepSeconds: 30,
+            queryType: "range",
+          },
+        },
+        {
+          kind: "metrics",
+          toolName: "query_prometheus",
+          args: {
+            datasourceUid: "grafanacloud-prom",
+            expr: `avg(greenlight_render_duration_ms{experiment_id=${experimentSelector}, variant="candidate"})`,
+            startTime: window.from,
+            endTime: window.to,
+            stepSeconds: 30,
+            queryType: "range",
+          },
+        },
+        {
+          kind: "logs",
+          toolName: "query_loki_logs",
+          args: {
+            datasourceUid: "grafanacloud-logs",
+            logql: `{service_name="greenlight-canary"} | json | experiment_id = ${experimentSelector}`,
+            startRfc3339: window.from,
+            endRfc3339: window.to,
+          },
+        },
+        {
+          kind: "traces",
+          toolName: "tempo_traceql-search",
+          args: {
+            datasourceUid: "grafanacloud-traces",
+            query: `{ resource.service.name = "greenlight-canary" && span.experiment_id = ${experimentSelector} }`,
+            start: window.from,
+            end: window.to,
+          },
+        },
+      ],
     },
   });
 
@@ -110,7 +158,10 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
       owner: "deterministic-policy-evaluator",
       immutableDecisionReceiptFingerprint: canary.decisionReceipt.fingerprint,
       verdictChangedByAgent: false,
-      backendValueReconstruction: "pending schema review of this first live capture",
+      backendValueReconstruction: Object.fromEntries((["metrics", "logs", "traces"] as const).map((kind) => [kind, {
+        dataPresent: result.receipts.some((receipt) => receipt.kind === kind && receipt.dataPresent),
+        receiptIds: result.receipts.filter((receipt) => receipt.kind === kind).map((receipt) => receipt.receiptId),
+      }])),
     },
   });
   const decisionCard: DecisionCard = {
