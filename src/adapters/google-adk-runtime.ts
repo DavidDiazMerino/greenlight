@@ -28,7 +28,7 @@ const EXPERIMENT_AGENT_INSTRUCTION = [
 ].join(" ");
 
 const DECISION_AGENT_INSTRUCTION = [
-  "You are Greenlight's Evidence & Decision Agent for a post-production supervisor.",
+  "You are Greenlight's Evidence & Decision Agent for a media platform lead reviewing a dependency update.",
   "Return one JSON object only with string fields diagnosis and recommendedAction.",
   "Use only the supplied receipted evidence.",
   "Explain the measured cause and propose a replayable corrective action.",

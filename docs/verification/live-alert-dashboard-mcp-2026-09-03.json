@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "1.0",
+  "verificationType": "credentialed-live-sanitized",
+  "verifiedAt": "2026-09-03T10:56:38.187Z",
+  "provenance": "grafana-mcp",
+  "synthetic": true,
+  "fixtureScope": "local/synthetic canary exported to a real Grafana Cloud stack",
+  "model": "gemini-2.5-pro",
+  "mcpEndpoint": "https://mcp.grafana.com/mcp",
+  "discoveredToolCount": 119,
+  "experimentId": "gl-local-336eb8e147c9",
+  "grafanaDashboardUrl": "https://merryboxwood1367.grafana.net/d/greenlight-release-gate?from=1788432690484&to=1788433021337&var-experiment_id=gl-local-336eb8e147c9",
+  "narrative": {
+    "diagnosis": "The release is on hold due to a regression in the candidate variant. The 'Greenlight caption safe-area violation' alert is firing. The worst failure was in clip `v02`, which overflowed the caption safe area by 61 pixels. The failure is confirmed in trace `2fcd305798bf68e69c11317d946fba4d`.",
+    "recommendedAction": "Review the failing trace and the release gate dashboard to diagnose the regression. The candidate release should be rejected unless the safe-area violation is a false positive or can be remediated."
+  },
+  "rootCause": {
+    "clipId": "v02",
+    "violationPx": 61,
+    "traceId": "2fcd305798bf68e69c11317d946fba4d",
+    "traceConfirmedByTempo": true
+  },
+  "decision": {
+    "verdict": "HOLD",
+    "reason": "GATE_FAILED",
+    "policyOwner": "deterministic-policy-evaluator",
+    "policyHash": "sha256:6a909329bd4c0312ddf1dd7faeb455123439a2ae5101aaae490c8c8487494673",
+    "verdictChangedByAgent": false,
+    "candidateFailures": 5,
+    "maximumViolationPx": 61,
+    "decisionReceiptFingerprint": "sha256:5c201fb351f634bdc6f06ab4575ba70dc13c5cdf26674d9a9fecb6f151b4e058",
+    "mcpPolicyReevaluation": {
+      "decision": "HOLD",
+      "reason": "GATE_FAILED",
+      "rawProofsRehashed": 4,
+      "matchesLocalVerdict": true
+    }
+  },
+  "evidenceReceipts": [
+    {
+      "kind": "metrics",
+      "toolName": "query_prometheus",
+      "receiptId": "1195df629baf3fe05eee7a83a6bae0e052fb3a4b949fe22d8b74cbcdd7fe0143",
+      "resultHash": "sha256:d1228f5c2f33f3e9a68266e809fae73c7d641d9bf98f38910ff6bdd8ea85c4cf",
+      "dataPresent": true
+    },
+    {
+      "kind": "metrics",
+      "toolName": "query_prometheus",
+      "receiptId": "849d7b64d4e58d8bcc35e939e6135c1ebe9aa1f4888ce29f8cf8d2e6b40de73b",
+      "resultHash": "sha256:16b7298e676d74b86afb13c9aafdfcd698a0c4fa776885a80bd0ae30669b90af",
+      "dataPresent": true
+    },
+    {
+      "kind": "logs",
+      "toolName": "query_loki_logs",
+      "receiptId": "0872c7ba1d2d8bee5cdde2064ddbdd644c3b0d0d4ad67ae4c82fe4fc34a7bda3",
+      "resultHash": "sha256:985e3779b21e36685d8cd96d083e51cfb572c3e882ca9feda74ffae9d41e86b3",
+      "dataPresent": true
+    },
+    {
+      "kind": "traces",
+      "toolName": "tempo_traceql-search",
+      "receiptId": "73b720a734faea038aa2d49d25fb1fc8c495c02388e191264186bc9bd6dab8aa",
+      "resultHash": "sha256:d78f0df9a25566007d8b7e6e9f753a8d7da71c0c3c24392060cbd8d16e168326",
+      "dataPresent": true,
+      "returnedTraceIds": 16
+    }
+  ],
+  "workflowReceipts": [
+    {
+      "kind": "alert",
+      "toolName": "alerting_manage_rules",
+      "receiptId": "0657c1fd2b58cdc98d1c052e4d6b0cc3d3eae64ae77b307f2dfce485fe80da33",
+      "resultHash": "sha256:37423ce00e7fb97bc75e57be853198f8820ae89a988cac1e7cdde0fa966a104e",
+      "succeeded": true
+    },
+    {
+      "kind": "dashboard-search",
+      "toolName": "search_dashboards",
+      "receiptId": "c43d3ed000975ba8f932df62ca141fce74ff17ad653de38cfc2873c0cf9b438d",
+      "resultHash": "sha256:219ffeece6a985b555fbb9575033920797d2cac5ddb6937532809e5ea6a79110",
+      "succeeded": true
+    },
+    {
+      "kind": "annotation",
+      "toolName": "create_annotation",
+      "receiptId": "4f7924a356ce024d2d4c31ec79d0212d00f3c3c6b3c60bbbbe3e1074b42c2f08",
+      "resultHash": "sha256:bc0d5c9021c2c35de7e2b02b02bc8658f78340dca894d098721834b6927deba4",
+      "succeeded": true
+    },
+    {
+      "kind": "navigation",
+      "toolName": "generate_deeplink",
+      "receiptId": "d32dc2cfb15c32804005131b9395fa4921bd33dda3303b9ab95125edb3f2a719",
+      "resultHash": "sha256:e29d0648d87ce5aad350df4cdd65431843bfec59ae9a7447a0aad46bf3f46b56",
+      "succeeded": true
+    }
+  ],
+  "sanitization": {
+    "rawMcpResultsIncluded": false,
+    "oauthTokensIncluded": false,
+    "otlpHeadersIncluded": false,
+    "googleCredentialsIncluded": false
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "rule_uid": "greenlight-caption-safe-area",
+  "title": "Greenlight caption safe-area violation",
+  "rule_group": "greenlight-release-gates",
+  "folder_uid": "greenlight",
+  "condition": "A",
+  "data": [
+    {
+      "refId": "A",
+      "queryType": "instant",
+      "relativeTimeRange": { "from": 120, "to": 0 },
+      "datasourceUid": "grafanacloud-prom",
+      "model": {
+        "datasource": { "type": "prometheus", "uid": "grafanacloud-prom" },
+        "editorMode": "code",
+        "expr": "max(greenlight_caption_safe_area_violation_px{variant=\"candidate\"}) > 0",
+        "instant": true,
+        "intervalMs": 1000,
+        "legendFormat": "safe-area violation",
+        "maxDataPoints": 43200,
+        "range": false,
+        "refId": "A"
+      }
+    }
+  ],
+  "no_data_state": "OK",
+  "exec_err_state": "Error",
+  "for": "0s",
+  "is_paused": false,
+  "annotations": {
+    "description": "Candidate caption pixels exceed the committed 9:16 safe area. The deterministic Greenlight policy must hold the release.",
+    "runbook_url": "https://github.com/DavidDiazMerino/greenlight/blob/main/docs/grafana-workflow.md",
+    "summary": "Greenlight measured a caption safe-area violation."
+  },
+  "labels": {
+    "component": "caption-compositor",
+    "gate": "caption-safe-area-9x16",
+    "owner": "deterministic-policy-evaluator",
+    "severity": "critical"
+  },
+  "org_id": 1,
+  "disable_provenance": true
+}

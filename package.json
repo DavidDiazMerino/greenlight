@@ -13,18 +13,26 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test --test-isolation=none test/*.test.ts",
     "canary": "node --experimental-strip-types src/cli.ts canary",
+    "grafana:setup": "node --env-file=.env --experimental-strip-types src/cli.ts grafana-setup",
     "agent:live": "node --env-file=.env --experimental-strip-types src/cli.ts agent-live",
+    "live:sanitize": "node --experimental-strip-types scripts/sanitize-live-verification.ts",
     "demo-fixture": "node --experimental-strip-types src/cli.ts demo-fixture",
     "dev": "node --experimental-strip-types src/server.ts",
-    "build": "node --experimental-strip-types scripts/build.ts"
+    "build": "node --experimental-strip-types scripts/build.ts",
+    "public:live": "node --experimental-strip-types scripts/apply-public-live-verification.ts",
+    "receipt:sign": "node --env-file-if-exists=.env --experimental-strip-types scripts/sign-decision-receipt.ts",
+    "receipt:verify": "node --experimental-strip-types scripts/verify-decision-receipt-signature.ts"
   },
   "dependencies": {
+    "@google-cloud/kms": "^5.7.0",
     "@google/adk": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "overrides": {
-    "adm-zip": "^0.6.0"
+    "adm-zip": "^0.6.0",
+    "qs": "^6.16.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

@@ -21,7 +21,8 @@ test("Decision Card server exposes UI and artifacts while containing traversal",
     });
     const address = server.address() as AddressInfo;
     const origin = `http://127.0.0.1:${address.port}`;
-    const [health, home, card, traversal] = await Promise.all([
+    const [health, reservedHealth, home, card, traversal] = await Promise.all([
+      fetch(`${origin}/health`),
       fetch(`${origin}/healthz`),
       fetch(`${origin}/`),
       fetch(`${origin}/artifacts/latest/decision-card.json`),
@@ -29,8 +30,11 @@ test("Decision Card server exposes UI and artifacts while containing traversal",
     ]);
     assert.equal(health.status, 200);
     assert.deepEqual(await health.json(), { status: "ok" });
+    assert.equal(reservedHealth.status, 404);
     assert.equal(home.status, 200);
     assert.match(home.headers.get("content-type") ?? "", /^text\/html/);
+    assert.equal(home.headers.get("x-content-type-options"), "nosniff");
+    assert.match(home.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
     assert.match(await home.text(), /Greenlight/);
     assert.equal(card.status, 200);
     assert.match(card.headers.get("content-type") ?? "", /^application\/json/);

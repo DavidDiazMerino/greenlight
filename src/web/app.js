@@ -4,15 +4,50 @@ const fmtRate = (value) => `${Math.round(Number(value) * 100)}%`;
 const shortHash = (value) => value?.startsWith("sha256:") ? `sha256:${value.slice(7, 19)}…` : value;
 const safe = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
 const list = (value) => Array.isArray(value) ? value : [];
+const safeHref = (value, { sameOrigin = false } = {}) => {
+  try {
+    const parsed = new URL(String(value ?? ""), window.location.origin);
+    if (!["http:", "https:"].includes(parsed.protocol)) return null;
+    if (sameOrigin && parsed.origin !== window.location.origin) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+};
 const metricLabel = {
   caption_safe_area_pass_rate: "Caption safe area",
   output_validity_pass_rate: "Output validity",
   p95_render_duration: "Render duration p95",
   run_coverage: "Run coverage",
 };
+const documentedIncidents = [
+  {
+    system: "REMOTION / LAMBDA",
+    failure: "Black frames and flicker appeared where distributed render chunks were joined.",
+    source: "remotion-dev/remotion #991",
+    url: "https://github.com/remotion-dev/remotion/issues/991",
+  },
+  {
+    system: "REMOTION UPGRADE",
+    failure: "A version update was followed by intermittent renders stalling until Lambda timed out.",
+    source: "remotion-dev/remotion #5598",
+    url: "https://github.com/remotion-dev/remotion/issues/5598",
+  },
+  {
+    system: "LIBASS / SUBTITLES",
+    failure: "Release notes document regressions and fixes affecting font sizing, margins, and positioning.",
+    source: "libass release history",
+    url: "https://github.com/libass/libass/releases",
+  },
+];
 
 function value(gate, variant) {
   const number = Number(gate[variant]);
+  if (gate.metric === "run_coverage") {
+    return variant === "candidate"
+      ? `${Number(gate.baseline) + Number(gate.candidate)} runs`
+      : `${Number(gate.baseline)} + ${Number(gate.candidate)}`;
+  }
   if (gate.unit === "rate") return fmtRate(number);
   if (gate.unit === "ms") return `${Math.round(number)} ms`;
   return `${number} runs`;
@@ -65,7 +100,9 @@ function invariantRow(check) {
   const passed = check.candidatePass === true;
   const measurement = check.measurement;
   const measured = measurement
-    ? `${measurement.unit === "rate" ? fmtRate(measurement.candidate) : safe(measurement.candidate)} · ${safe(measurement.threshold)}`
+    ? `${check.invariantId === "paired-run-coverage"
+        ? `${Number(measurement.baseline) + Number(measurement.candidate)} paired runs`
+        : measurement.unit === "rate" ? fmtRate(measurement.candidate) : safe(measurement.candidate)} · ${safe(measurement.threshold)}`
     : "result fingerprinted";
   return `<li class="invariant ${passed ? "pass" : "fail"}"><span class="status-dot">${passed ? "✓" : "!"}</span><div><b>${safe(check.invariantName)}</b><small>${safe(check.severity)} · ${measured}</small><code>${safe(check.invariantId)}</code></div></li>`;
 }
@@ -77,6 +114,11 @@ function truth(value) {
 function render(card) {
   const failed = list(card.gates).filter((gate) => !gate.pass);
   const local = card.provenance === "local/synthetic";
+  const liveVerified = card.liveVerification?.status === "credentialed-live-sanitized";
+  const kmsVerified = card.kmsVerification?.status === "verified-cloud-kms-signature";
+  const liveVerificationUrl = safeHref(card.liveVerification?.source, { sameOrigin: true });
+  const kmsVerificationUrl = safeHref(card.kmsVerification?.source, { sameOrigin: true });
+  const grafanaDashboardUrl = safeHref(card.grafanaDashboardUrl);
   const casefile = card.evidenceCasefile ?? {};
   const evidence = list(casefile.evidence);
   const contradictions = list(casefile.contradictions);
@@ -89,23 +131,61 @@ function render(card) {
   const requiredRuns = Number(resilience.canaryCoverage?.requiredRuns ?? 16);
   const canaryChecks = list(card.canaryRun?.checks);
   const blocking = canaryChecks.filter((item) => item.severity === "blocking" && !item.candidatePass);
+  const operator = card.operatorContext ?? {
+    name: "Avery Morgan",
+    role: "Media Platform Lead",
+    organization: "Loopline Studios — fictional scenario",
+    fictional: true,
+    moment: "Friday · 09:12 · before the campaign render queue",
+    question: "The dependency PR is green and promises faster renders. Is it safe to merge before thousands of videos run?",
+  };
+  const upgrade = card.upgradeRequest ?? {
+    source: "automated dependency pull request",
+    benefitClaim: "Fuse three media stages into one compositor pass for faster rendering.",
+    statusBeforeGreenlight: "Install succeeds · unit tests pass · output files are valid",
+  };
   app.innerHTML = `
     <header class="topbar">
       <div class="brand"><span class="brand-mark">G</span><div><strong>GREENLIGHT</strong><small>Evidence before publish</small></div></div>
-      <div class="provenance ${local ? "local" : "live"}"><span></span>${safe(card.provenance)} · ${card.synthetic ? "SYNTHETIC DEMO" : "LIVE EVIDENCE"}</div>
+      <div class="provenance ${liveVerified ? "live" : local ? "local" : "live"}"><span></span>${liveVerified ? `LIVE GRAFANA MCP${kmsVerified ? " + CLOUD KMS" : ""} VERIFIED · SYNTHETIC MEDIA` : `${safe(card.provenance)} · ${card.synthetic ? "SYNTHETIC DEMO" : "LIVE EVIDENCE"}`}</div>
       <div class="experiment">EXPERIMENT <strong>${safe(card.experimentId)}</strong></div>
     </header>
 
+    <section class="story-intro" aria-labelledby="avery-question">
+      <img src="/avery-workstation.svg" alt="Synthetic illustration of Avery reviewing a dependency update and a video regression" />
+      <div class="story-copy">
+        <span>MEET ${safe(operator.name).toUpperCase()} · FICTIONAL SCENARIO</span>
+        <h1 id="avery-question">“${safe(operator.question)}”</h1>
+        <p><b>${safe(operator.name)}</b> is the ${safe(operator.role)} at ${safe(operator.organization)}. ${safe(operator.moment)}.</p>
+      </div>
+      <div class="upgrade-ticket">
+        <span>INCOMING UPDATE</span>
+        <b>${safe(card.change?.fromVersion)}</b><i>→</i><b>${safe(card.change?.toVersion)}</b>
+        <p>${safe(upgrade.benefitClaim)}</p>
+        <small>BEFORE GREENLIGHT<br>${safe(upgrade.statusBeforeGreenlight)}</small>
+      </div>
+    </section>
+
     <section class="decision-banner">
       <div class="decision-word"><span class="pulse"></span>${safe(card.decision)}</div>
-      <div class="decision-copy"><div>BASELINE <span>→</span> RELEASE CANDIDATE</div><h1>${card.deploymentBlocked ? "DEPLOYMENT BLOCKED" : "ELIGIBLE FOR HUMAN PROMOTION"}</h1></div>
+      <div class="decision-copy"><div>SHOULD AVERY MERGE THE DEPENDENCY PR?</div><h1>${card.deploymentBlocked ? "NO — DEPLOYMENT BLOCKED" : "YES — ELIGIBLE FOR HUMAN PROMOTION"}</h1></div>
       <div class="coverage"><strong>${safe(card.runCoverage)}/16</strong><span>RUNS VERIFIED</span></div>
     </section>
 
     <section class="workflow-impact" aria-labelledby="workflow-impact-title">
-      <div><span>WHY THIS AFFECTS MAYA</span><h2 id="workflow-impact-title">The candidate changes the compositor on her portrait finishing path.</h2></div>
+      <div><span>WHY THIS AFFECTS AVERY</span><h2 id="workflow-impact-title">A green dependency PR changes the compositor inside her production render path.</h2></div>
       <p>${safe(card.change?.workflowImpact)}</p>
       <div class="change-route"><b>${safe(card.change?.fromVersion)}</b><span>→</span><b>${safe(card.change?.toVersion)}</b><small>${list(card.change?.affectedStages).map(safe).join(" · ")}</small></div>
+    </section>
+
+    <section class="incident-section" aria-labelledby="incident-title">
+      <div class="section-heading"><div><span>REALITY CHECK</span> THIS FAILURE CATEGORY IS DOCUMENTED</div><p id="incident-title">Public examples for context · never used as evidence for Avery's synthetic decision</p></div>
+      <div class="incident-grid">
+        ${documentedIncidents.map((incident) => {
+          const href = safeHref(incident.url);
+          return `<article class="incident-card"><span>${safe(incident.system)}</span><h3>⚠ ${safe(incident.failure)}</h3>${href ? `<a href="${safe(href)}" target="_blank" rel="noreferrer">Open documented source ↗</a>` : ""}<small>${safe(incident.source)} · external context, not decision evidence</small></article>`;
+        }).join("")}
+      </div>
     </section>
 
     <section class="workspace">
@@ -177,16 +257,21 @@ function render(card) {
         <div><dt>CASEFILE</dt><dd title="${safe(casefile.fingerprint)}">${safe(shortHash(casefile.fingerprint))}</dd><small>${evidence.length} evidence items</small></div>
         <div><dt>CANARY RUN</dt><dd title="${safe(card.canaryRun?.fingerprint)}">${safe(shortHash(card.canaryRun?.fingerprint))}</dd><small>${safe(card.canaryPack?.id)}@${safe(card.canaryPack?.version)}</small></div>
         <div><dt>TRACE PAIR</dt><dd>${safe(card.traceIds?.[0]?.slice(0, 12))}…</dd><small>${safe(card.traceIds?.[1]?.slice(0, 12))}… · local trace-shaped only</small></div>
+        <div><dt>CLOUD KMS SIGNATURE</dt><dd title="${safe(card.kmsVerification?.signatureFingerprint)}">${kmsVerified ? safe(shortHash(card.kmsVerification.signatureFingerprint)) : "NOT ATTACHED"}</dd><small>${kmsVerified ? "P-256 signature verified offline" : "local card is unsigned"}</small></div>
       </dl>
       <div class="receipt-actions">
         <a class="button primary" href="/artifacts/latest/artifact-index.json" download>Download artifacts</a>
         <a class="button" href="/artifacts/latest/evidence-casefile.json" target="_blank" rel="noreferrer">Open casefile JSON</a>
         <a class="button" href="/artifacts/latest/decision-receipt.json" target="_blank" rel="noreferrer">Verify receipt</a>
+        ${liveVerified && liveVerificationUrl ? `<a class="button" href="${safe(liveVerificationUrl)}" target="_blank" rel="noreferrer">View live verification</a>` : ""}
+        ${kmsVerified && kmsVerificationUrl ? `<a class="button" href="${safe(kmsVerificationUrl)}" target="_blank" rel="noreferrer">Verify Cloud KMS signature</a>` : ""}
         <button class="button" id="replay" data-command="${safe(card.replayCommand)}">Replay experiment</button>
-        <button class="button disabled" title="No Grafana MCP receipts exist in this local fixture" disabled>Grafana MCP not connected</button>
+        ${grafanaDashboardUrl
+          ? `<a class="button" href="${safe(grafanaDashboardUrl)}" target="_blank" rel="noreferrer">Open Grafana investigation</a>`
+          : `<button class="button disabled" title="No Grafana MCP receipts exist in this local fixture" disabled>Grafana MCP not connected</button>`}
       </div>
     </section>
-    <footer><span>Every update is a hypothesis. Greenlight turns it into a production decision.</span><span>${failed.length} failed gate${failed.length === 1 ? "" : "s"} · completed ${safe(new Date(card.completedAt).toLocaleString())}</span></footer>`;
+    <footer><span>Every dependency update is a hypothesis. Greenlight tests it against the work Avery must ship.</span><span>${failed.length} failed gate${failed.length === 1 ? "" : "s"} · completed ${safe(new Date(card.completedAt).toLocaleString())}</span></footer>`;
 
   const videos = [...document.querySelectorAll("video")];
   const buttons = [...document.querySelectorAll(".play-toggle")];

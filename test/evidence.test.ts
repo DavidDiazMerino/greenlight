@@ -9,8 +9,14 @@ import {
   validateDecisionArtifactShapes,
 } from "../src/evidence.ts";
 import type { Change, DecisionCard, EvidenceItem } from "../src/types.ts";
+import { fingerprint } from "../src/util.ts";
 
 const observedAt = "2026-08-22T00:00:00.000Z";
+const toolchain = {
+  font: { family: "DejaVu Sans" as const, path: "assets/fonts/DejaVuSans.ttf", sha256: "sha256:font", fontConfigSha256: "sha256:fontconfig" },
+  ffmpeg: { version: "ffmpeg test", binaryFingerprint: "sha256:ffmpeg" },
+  ffprobe: { version: "ffprobe test", binaryFingerprint: "sha256:ffprobe" },
+};
 
 function item(id: string, overrides: Partial<EvidenceItem> = {}): EvidenceItem {
   return {
@@ -47,7 +53,7 @@ function change(): Change {
     synthetic: true,
     sourceEvidenceIds: ["evidence:manifest"],
     affectedStages: ["portrait_reframe", "caption_layout", "render"],
-    workflowImpact: "Maya's 9:16 caption finishing path is exercised by this compositor change.",
+    workflowImpact: "Avery's 9:16 caption finishing path is exercised by this compositor change.",
   };
 }
 
@@ -59,6 +65,12 @@ test("evidence fingerprints are order-independent and provenance-sensitive", () 
     fingerprintEvidenceItems([first, second]),
     fingerprintEvidenceItems([first, { ...second, provenance: { ...second.provenance, artifact: "fixture://different" } }]),
   );
+});
+
+test("canonical fingerprints use locale-independent code-unit key ordering", () => {
+  const left = { "é": 1, z: 2, "ä": 3, a: 4 };
+  const right = { a: 4, "ä": 3, z: 2, "é": 1 };
+  assert.equal(fingerprint(left), fingerprint(right));
 });
 
 test("a strong applicable reproduced signal is recommendation eligible", () => {
@@ -130,6 +142,7 @@ test("decision receipt fingerprint is stable and changes with committed verdict 
     policyName: "vertical-delivery",
     policyVersion: "v1",
     policyHash: "sha256:policy",
+    toolchain,
     verdict: "HOLD" as const,
     reasons: ["GATE_FAILED", "caption-safe-area-9x16"],
     issuedAt: observedAt,
@@ -147,11 +160,13 @@ test("decision artifacts expose auditable casefile, receipt, outcome, and access
   const receipt = createDecisionReceipt({
     change: change(), evidenceCasefileFingerprint: "sha256:casefile", signalFingerprint: "sha256:signal",
     canaryPackId: "vertical-social", canaryPackVersion: "1.0.0", canaryPackFingerprint: "sha256:pack", canaryRunFingerprint: "sha256:run",
-    policyName: "vertical-delivery", policyVersion: "v1", policyHash: "sha256:policy", verdict: "HOLD", reasons: ["GATE_FAILED"],
+    policyName: "vertical-delivery", policyVersion: "v1", policyHash: "sha256:policy", toolchain, verdict: "HOLD", reasons: ["GATE_FAILED"],
     issuedAt: observedAt, provenance: "local/synthetic",
   });
   const outcome = createDecisionOutcomeFixture(receipt, observedAt);
   const card = {
+    operatorContext: { name: "Avery Morgan", role: "Media Platform Lead", organization: "Fictional studio", fictional: true, moment: "Friday", question: "Is the update safe?" },
+    upgradeRequest: { source: "dependency PR", benefitClaim: "Faster renders", statusBeforeGreenlight: "CI passed" },
     change: change(),
     evidenceCasefile: { schemaVersion: "1.0", id: "casefile:test", fingerprint: "sha256:casefile", signal: { evidenceAssessmentVersion: "evidence-assessment/v1", supportChecks: [{ name: "fixture", status: "verified", basis: "test fixture" }] }, evidence: [item("evidence:a")], contradictions: [], resilience: { recommendationEligible: true }, affectedInventory: ["caption-compositor"], replay: "npm run canary" },
     canaryPack: { schemaVersion: "1.0", id: "vertical-social", version: "1.0.0", fingerprint: "sha256:pack", invariants: [] },
@@ -159,6 +174,7 @@ test("decision artifacts expose auditable casefile, receipt, outcome, and access
     renderComparison: { baseline: { path: "baseline-multipass", compositorPasses: 2, p95DurationMs: 1000 }, candidate: { path: "candidate-fused", compositorPasses: 1, p95DurationMs: 900 }, candidateP95Improvement: 0.1 },
     decisionReceiptFingerprint: receipt.fingerprint,
     policyOwner: "deterministic-policy-evaluator",
+    toolchain,
   } as unknown as DecisionCard;
   assert.doesNotThrow(() => validateDecisionArtifactShapes(card, card.evidenceCasefile, receipt, outcome));
   assert.equal(outcome.provenance, "local/synthetic");

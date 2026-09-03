@@ -6,6 +6,8 @@ The checked-in Decision Card remains deliberately complete without network acces
 
 [`src/adapters/grafana-adk.ts`](../src/adapters/grafana-adk.ts) uses `MCPToolset` from Google ADK against the hosted Streamable HTTP endpoint. It sends the stack-routing header, discovers tools at runtime, requires metric/log/trace capabilities, and records the exact server identity, tool name, arguments, raw result, result hash, receipt time, data-presence check, and returned trace IDs. The agent receives an exact query plan and fails closed if it alters a call, omits a category, or gets an empty result for any required signal.
 
+The extended live mission also requires the named Grafana alert to be `firing`, finds the versioned dashboard, writes a Decision Receipt-bound annotation containing the exact failing clip, overflow, and trace ID, and generates a same-stack review link. These operational receipts are stored separately from metric/log/trace evidence receipts and have no policy authority. Raw MCP results are re-hashed and matched to receipt IDs before the policy is rerun with `requireMcp: true`. `make grafana-setup` creates or updates the versioned resources through genuine MCP write tools; details are in [`grafana-workflow.md`](grafana-workflow.md).
+
 [`src/adapters/grafana-oauth.ts`](../src/adapters/grafana-oauth.ts) implements the hosted service's interactive OAuth 2.1/PKCE flow. Registration, refresh token, access token, verifier, and discovery state are stored outside the repository in a `0600` file. The authorization callback binds only to `127.0.0.1` and validates OAuth state.
 
 The older transport-independent boundary in [`src/adapters/grafana-mcp.ts`](../src/adapters/grafana-mcp.ts) remains available for the official self-hosted MCP server. Greenlight never invents a successful discovery, result, or receipt.
@@ -32,4 +34,8 @@ The implementation is locally verified with a fixed test model and a real local 
 - a populated, ignored `.env` based on `.env.example`;
 - a `make agent-live` capture retained locally, with only a credential-free summary committed publicly.
 
-The 2026-08-25 live capture satisfied these conditions from the development machine. No OpenAI or Anthropic model/API is invoked by Greenlight.
+The 2026-09-03 live capture satisfied these conditions from the development machine with `gemini-2.5-pro`. No OpenAI or Anthropic model/API is invoked by Greenlight.
+
+## Cloud KMS receipt attestation
+
+[`src/kms-signer.ts`](../src/kms-signer.ts) calls Google Cloud KMS `asymmetricSign` on an explicit P-256 key version. The canonical signed payload embeds the full Decision Receipt, render toolchain, experiment/commit identity, and the fingerprint of the sanitized live verification. [`src/kms-envelope.ts`](../src/kms-envelope.ts) verifies the exported public key, internal commitments, envelope fingerprint, and ECDSA signature without cloud credentials. The checked-in public key is verification material only; the private key never leaves KMS.

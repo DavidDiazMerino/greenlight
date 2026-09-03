@@ -13,6 +13,7 @@ import type {
   EvidenceResilienceAssessment,
   GateResult,
   Invariant,
+  RenderToolchain,
   Signal,
 } from "./types.ts";
 import { fingerprint, round, stableId } from "./util.ts";
@@ -242,6 +243,7 @@ export function createDecisionReceipt(input: {
   policyName: string;
   policyVersion: string;
   policyHash: string;
+  toolchain: RenderToolchain;
   verdict: DecisionVerdict;
   reasons: string[];
   issuedAt: string;
@@ -254,6 +256,7 @@ export function createDecisionReceipt(input: {
     canaryPack: input.canaryPackFingerprint,
     canaryRun: input.canaryRunFingerprint,
     policy: input.policyHash,
+    toolchain: fingerprint(input.toolchain),
   };
   const committed = {
     schemaVersion: "1.0" as const,
@@ -297,6 +300,13 @@ function requireShape(condition: unknown, message: string): asserts condition {
 
 export function validateDecisionArtifactShapes(card: DecisionCard, casefile: EvidenceCasefile, receipt: DecisionReceipt, outcome: DecisionOutcome): void {
   requireShape(card.change?.id, "card.change.id");
+  requireShape(
+    card.operatorContext?.fictional === true &&
+    typeof card.operatorContext.name === "string" &&
+    typeof card.operatorContext.question === "string" &&
+    typeof card.upgradeRequest?.benefitClaim === "string",
+    "fictional operator and dependency upgrade context",
+  );
   requireShape(card.evidenceCasefile?.fingerprint === casefile.fingerprint, "card casefile commitment");
   requireShape(Array.isArray(casefile.evidence) && casefile.evidence.length > 0, "casefile evidence");
   requireShape(
@@ -315,6 +325,7 @@ export function validateDecisionArtifactShapes(card: DecisionCard, casefile: Evi
     "render path comparison",
   );
   requireShape(card.decisionReceiptFingerprint === receipt.fingerprint, "receipt fingerprint");
+  requireShape(card.toolchain && receipt.commitments.toolchain === fingerprint(card.toolchain), "render toolchain commitment");
   requireShape(receipt.immutable && receipt.policy.owner === "deterministic-policy-evaluator", "immutable policy-owned receipt");
   requireShape(outcome.observationStatus === "fixture/not-observed" && outcome.observedAt === null, "honest outcome fixture");
 }

@@ -105,16 +105,40 @@ export interface Span {
   attributes: Record<string, string | number | boolean>;
 }
 
+export interface RenderToolchain {
+  font: { family: "DejaVu Sans"; path: string; sha256: string; fontConfigSha256: string };
+  ffmpeg: { version: string; binaryFingerprint: string };
+  ffprobe: { version: string; binaryFingerprint: string };
+}
+
 export interface McpReceipt {
   receiptId: string;
   kind: EvidenceKind;
   serverIdentity: string;
   toolName: string;
-  query: unknown;
+  query?: unknown;
   resultHash: string;
-  receivedAt: string;
+  receivedAt?: string;
   dataPresent?: boolean;
   traceIds?: string[];
+}
+
+export interface McpEvidenceProof {
+  receiptId: string;
+  result: unknown;
+}
+
+export type GrafanaWorkflowKind = "alert" | "dashboard-search" | "annotation" | "navigation";
+
+export interface GrafanaWorkflowReceipt {
+  receiptId: string;
+  kind: GrafanaWorkflowKind;
+  serverIdentity: string;
+  toolName: string;
+  input?: unknown;
+  resultHash: string;
+  receivedAt?: string;
+  succeeded: boolean;
 }
 
 export interface EvidenceBundle {
@@ -126,9 +150,11 @@ export interface EvidenceBundle {
   metrics: MediaQaResult[];
   logs: LocalLog[];
   traces: Span[];
+  toolchain: RenderToolchain;
   evidencePresent: EvidenceKind[];
   localReceipt: { bundleHash: string; source: "deterministic-local-runner" } | null;
   mcpReceipts: McpReceipt[];
+  mcpProofs?: McpEvidenceProof[];
 }
 
 export type EvidenceSourceType =
@@ -328,6 +354,7 @@ export interface DecisionReceipt {
     readonly canaryPack: string;
     readonly canaryRun: string;
     readonly policy: string;
+    readonly toolchain: string;
   };
   readonly canaryPack: { readonly id: string; readonly version: string };
   readonly policy: { readonly name: string; readonly version: string; readonly hash: string; readonly owner: "deterministic-policy-evaluator" };
@@ -351,6 +378,19 @@ export interface DecisionOutcome {
 }
 
 export interface DecisionCard extends PolicyDecision {
+  operatorContext: {
+    name: string;
+    role: string;
+    organization: string;
+    fictional: true;
+    moment: string;
+    question: string;
+  };
+  upgradeRequest: {
+    source: string;
+    benefitClaim: string;
+    statusBeforeGreenlight: string;
+  };
   headline: string;
   baselineVersion: string;
   baselineDigest: string;
@@ -367,7 +407,25 @@ export interface DecisionCard extends PolicyDecision {
   diagnosis: string;
   recommendedAction: string;
   mcpReceipts: McpReceipt[];
+  grafanaWorkflowReceipts: GrafanaWorkflowReceipt[];
   grafanaEvidenceRefs: string[];
+  grafanaDashboardUrl: string | null;
+  liveVerification?: {
+    status: "credentialed-live-sanitized";
+    verifiedAt: string;
+    source: string;
+    decisionReceiptFingerprint: string;
+    note: string;
+  };
+  kmsVerification?: {
+    status: "verified-cloud-kms-signature";
+    signedAt: string;
+    source: string;
+    keyResource: string;
+    publicKeyPath: string;
+    signatureFingerprint: string;
+    decisionReceiptFingerprint: string;
+  };
   traceIds: string[];
   gitCommit: string;
   geminiModel: string;
@@ -380,6 +438,7 @@ export interface DecisionCard extends PolicyDecision {
   canaryRun: CanaryRun;
   decisionReceiptFingerprint: string;
   policyOwner: "deterministic-policy-evaluator";
+  toolchain: RenderToolchain;
   renderComparison: {
     baseline: { path: RenderPath; compositorPasses: number; p95DurationMs: number };
     candidate: { path: RenderPath; compositorPasses: number; p95DurationMs: number };

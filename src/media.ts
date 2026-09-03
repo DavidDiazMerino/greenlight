@@ -1,13 +1,19 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Clip, Dataset, MediaQaResult, Rect, RenderPath, Variant } from "./types.ts";
-import { rel, stableId, writeJson } from "./util.ts";
+import type { Clip, Dataset, MediaQaResult, Rect, RenderPath, RenderToolchain, Variant } from "./types.ts";
+import { hashFile, projectRoot, rel, stableId, writeJson } from "./util.ts";
 
 const FFMPEG_ARGS = ["-hide_banner", "-loglevel", "error", "-y"];
+const FONT_PATH = join(projectRoot, "assets", "fonts", "DejaVuSans.ttf");
+const FONT_CONFIG_PATH = join(projectRoot, "assets", "fonts", "fonts.conf");
 
 function command(program: string, args: string[], maxBuffer = 32 * 1024 * 1024): Buffer {
-  const result = spawnSync(program, args, { encoding: null, maxBuffer });
+  const result = spawnSync(program, args, {
+    encoding: null,
+    maxBuffer,
+    env: { ...process.env, FONTCONFIG_FILE: FONT_CONFIG_PATH },
+  });
   if (result.status !== 0) {
     const stderr = result.stderr?.toString("utf8") ?? "";
     throw new Error(`${program} failed (${result.status}): ${stderr.trim()}`);
@@ -18,6 +24,23 @@ function command(program: string, args: string[], maxBuffer = 32 * 1024 * 1024):
 export function assertFfmpegAvailable(): void {
   command("ffmpeg", ["-version"]);
   command("ffprobe", ["-version"]);
+}
+
+export async function describeMediaToolchain(): Promise<RenderToolchain> {
+  const ffmpegOutput = command("ffmpeg", ["-version"]).toString("utf8");
+  const ffprobeOutput = command("ffprobe", ["-version"]).toString("utf8");
+  const ffmpegPath = command("which", ["ffmpeg"]).toString("utf8").trim();
+  const ffprobePath = command("which", ["ffprobe"]).toString("utf8").trim();
+  return {
+    font: {
+      family: "DejaVu Sans",
+      path: rel(FONT_PATH),
+      sha256: await hashFile(FONT_PATH),
+      fontConfigSha256: await hashFile(FONT_CONFIG_PATH),
+    },
+    ffmpeg: { version: ffmpegOutput.split("\n")[0], binaryFingerprint: await hashFile(ffmpegPath) },
+    ffprobe: { version: ffprobeOutput.split("\n")[0], binaryFingerprint: await hashFile(ffprobePath) },
+  };
 }
 
 function xml(value: string): string {

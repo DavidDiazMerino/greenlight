@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "1.0",
+  "payload": {
+    "schemaVersion": "1.0",
+    "payloadType": "greenlight-decision-receipt",
+    "signedAt": "2026-09-03T10:56:43.517Z",
+    "experimentId": "gl-local-336eb8e147c9",
+    "gitCommit": "627d0d6dfb69a8d4f7e3d818696a6ffdb9adae80-dirty",
+    "decisionReceipt": {
+      "schemaVersion": "1.0",
+      "provenance": "local/synthetic",
+      "commitments": {
+        "change": "sha256:24e289ce0a4854b7a8b6d83915f26e9c46b66057ada4f7b844e11920e12d1fbf",
+        "evidenceCasefile": "sha256:100dc2aa8f8325d9db6d0256725cb6e417adf6cfd58d511f8f26d34eb750b9c1",
+        "signal": "sha256:b9f23ed7f3a880cc7a4a6e6fb0b1573f8d59a061317f9f5f32ec55fada465841",
+        "canaryPack": "sha256:855542fa0c3b1f63afe3b353de390e85671616d92fdd116306ba4841d0b8a2d6",
+        "canaryRun": "sha256:b0bc58048067f9038c74c369f6da7b32a4978932152a56d4db065422eace0f5b",
+        "policy": "sha256:6a909329bd4c0312ddf1dd7faeb455123439a2ae5101aaae490c8c8487494673",
+        "toolchain": "sha256:2a9cb9c3f488ffddc8d18eced502661d145e8c1fd447e1357b89146498fe3a1a"
+      },
+      "canaryPack": {
+        "id": "vertical-social-caption-delivery",
+        "version": "1.0.0"
+      },
+      "policy": {
+        "name": "vertical-delivery",
+        "version": "v1",
+        "hash": "sha256:6a909329bd4c0312ddf1dd7faeb455123439a2ae5101aaae490c8c8487494673",
+        "owner": "deterministic-policy-evaluator"
+      },
+      "verdict": "HOLD",
+      "reasons": [
+        "GATE_FAILED",
+        "caption-safe-area-9x16"
+      ],
+      "id": "decision-receipt:5c201fb351f634bd",
+      "issuedAt": "2026-09-03T10:52:52.755Z",
+      "immutable": true,
+      "fingerprint": "sha256:5c201fb351f634bdc6f06ab4575ba70dc13c5cdf26674d9a9fecb6f151b4e058"
+    },
+    "toolchain": {
+      "font": {
+        "family": "DejaVu Sans",
+        "path": "assets/fonts/DejaVuSans.ttf",
+        "sha256": "sha256:ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280",
+        "fontConfigSha256": "sha256:c4ee74df7ecd2966ac6c68b54bcc8485059f8e30000cb98c126456275ae3eb29"
+      },
+      "ffmpeg": {
+        "version": "ffmpeg version 6.1.1-3ubuntu5+esm10 Copyright (c) 2000-2023 the FFmpeg developers",
+        "binaryFingerprint": "sha256:9f126bd755615d8c5d9aa2e67c568626be05389feb795478e0f14d41217270f4"
+      },
+      "ffprobe": {
+        "version": "ffprobe version 6.1.1-3ubuntu5+esm10 Copyright (c) 2007-2023 the FFmpeg developers",
+        "binaryFingerprint": "sha256:b98cabc72a01bf522a3eb85cae3cf7a8843817bfb0315ff14d8699cef5413f7d"
+      }
+    },
+    "liveVerificationFingerprint": "sha256:163e005e868b092a9c79247121ac14b28cce32bd13e04868e38344ea15a7eca4"
+  },
+  "key": {
+    "resource": "projects/greenlight-agentic-cinema/locations/global/keyRings/greenlight-release-trust/cryptoKeys/decision-receipt-signer/cryptoKeyVersions/1",
+    "algorithm": "EC_SIGN_P256_SHA256",
+    "publicKeyPath": "policy/trust/decision-receipt-public-key.pem",
+    "publicKeySha256": "sha256:dff76fb8fa0b8f04f628b42a2100b39d63116670b942d5016b1f0e3d3e3f8820"
+  },
+  "signature": {
+    "encoding": "base64",
+    "value": "MEYCIQCJ/gJvEms3lsxd30+CruaxuwxIJBnxG+OJa27JeXcMhgIhALHhqtSdwUKNBNIIRKM6uLxugXm7T+QAUspC6RMASnX8"
+  },
+  "fingerprint": "sha256:bce6932d981391f5aca2335134a8a3c57ccb08981a360a8abe091b498b2e438d"
+}

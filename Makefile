@@ -1,4 +1,4 @@
-.PHONY: install typecheck test canary demo-fixture agent-live dev build clean-generated
+.PHONY: install typecheck test canary demo-fixture grafana-setup agent-live dev build clean-generated
 
 install:
 	npm run install:local
@@ -14,6 +14,9 @@ canary:
 
 demo-fixture:
 	npm run demo-fixture
+
+grafana-setup:
+	npm run grafana:setup
 
 agent-live:
 	npm run agent:live

@@ -1,5 +1,6 @@
 import type { EvidenceKind, McpReceipt } from "../types.ts";
-import { sha256, stableId } from "../util.ts";
+import { fingerprint } from "../util.ts";
+import { mcpReceiptId } from "../integrity.ts";
 
 export interface DiscoveredMcpTool {
   name: string;
@@ -40,11 +41,11 @@ export class GrafanaMcpAdapter {
     const advertised = await this.transport.listTools();
     if (!advertised.some((tool) => tool.name === toolName)) throw new Error(`Grafana MCP did not advertise configured tool: ${toolName}`);
     const result = await this.transport.callTool(toolName, input);
-    const resultHash = sha256(JSON.stringify(result));
+    const resultHash = fingerprint(result);
     return {
       result,
       receipt: {
-        receiptId: stableId(this.transport.serverIdentity, toolName, JSON.stringify(input), resultHash),
+        receiptId: mcpReceiptId({ serverIdentity: this.transport.serverIdentity, toolName, query: input, resultHash }),
         kind,
         serverIdentity: this.transport.serverIdentity,
         toolName,

@@ -5,6 +5,13 @@ artifacts/*
 assets/synthetic/generated/
 *.log
 .DS_Store
+# The submission edit and its generated media stay local; the product canary is
+# regenerated under assets/synthetic/generated/ and artifacts/ instead.
+media/
+scripts/capture-demo-ui.ts
+scripts/mux-demo-voice.ts
+scripts/qa-demo-video.ts
+scripts/render-demo-video.ts
 .env
 .env.*
 !.env.example

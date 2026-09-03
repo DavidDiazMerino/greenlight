@@ -13,8 +13,9 @@ import {
   createSignal,
   validateDecisionArtifactShapes,
 } from "./evidence.ts";
-import { assertFfmpegAvailable, generateOriginal, renderNoCaption, renderVariant, runMediaQa } from "./media.ts";
+import { assertFfmpegAvailable, describeMediaToolchain, generateOriginal, renderNoCaption, renderVariant, runMediaQa } from "./media.ts";
 import { evaluatePolicy, loadPolicy } from "./policy.ts";
+import { localEvidenceFingerprint } from "./integrity.ts";
 import { buildLog, buildTrace, prometheusText } from "./telemetry.ts";
 import type { CandidateManifest, Change, Dataset, DecisionCard, DecisionOutcome, DecisionReceipt, EvidenceBundle, EvidenceCasefile, EvidenceItem, MediaQaResult } from "./types.ts";
 import { fingerprint, hashFile, percentile95, projectRoot, rel, round, sha256, stableId, readJson, writeJson } from "./util.ts";
@@ -57,19 +58,20 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
   const datasetPath = join(projectRoot, "dataset", "vertical-social-v1.json");
   const manifestPath = join(projectRoot, "dataset", "candidate-manifest.json");
   const policyPath = join(projectRoot, "policy", "vertical-delivery-v1.yaml");
-  const [dataset, manifest, datasetHash, manifestHash, loadedPolicy] = await Promise.all([
+  const [dataset, manifest, datasetHash, manifestHash, loadedPolicy, toolchain] = await Promise.all([
     readJson<Dataset>(datasetPath),
     readJson<CandidateManifest>(manifestPath),
     hashFile(datasetPath),
     hashFile(manifestPath),
     loadPolicy(policyPath),
+    describeMediaToolchain(),
   ]);
   if (dataset.clips.length !== 8) throw new Error(`vertical-social-v1 must contain exactly 8 clips; found ${dataset.clips.length}`);
 
   const implementationHash = await hashFile(join(projectRoot, "src", "media.ts"));
   const baselineDigest = compositorDigest(manifest.baseline, "two-pass-final-portrait-safe-area-anchor", implementationHash);
   const candidateDigest = compositorDigest(manifest.candidate, "fused-pre-transform-anchor-mapped-after-layout", implementationHash);
-  const experimentId = `gl-local-${stableId(datasetHash, manifestHash, loadedPolicy.hash, baselineDigest, candidateDigest).slice(0, 12)}`;
+  const experimentId = `gl-local-${stableId(datasetHash, manifestHash, loadedPolicy.hash, baselineDigest, candidateDigest, fingerprint(toolchain)).slice(0, 12)}`;
   const artifactDir = join(projectRoot, "artifacts", experimentId);
   const mediaDir = join(artifactDir, "media");
   const originalsDir = join(projectRoot, "assets", "synthetic", "generated");
@@ -131,7 +133,6 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
   const generatedAt = new Date().toISOString();
   const logs = metrics.map((metric) => buildLog(metric, metric.variant === "baseline" ? baselineDigest : candidateDigest, generatedAt));
   const traces = metrics.flatMap((metric, index) => buildTrace(metric, metric.variant === "baseline" ? baselineDigest : candidateDigest, startedAt + index * 10_000));
-  const receiptPayload = JSON.stringify({ experimentId, metrics, logs, traces });
   const evidenceBundle: EvidenceBundle = {
     schemaVersion: "1.0",
     experimentId,
@@ -141,10 +142,12 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
     metrics,
     logs,
     traces,
+    toolchain,
     evidencePresent: ["metrics", "logs", "traces"],
-    localReceipt: { bundleHash: sha256(receiptPayload), source: "deterministic-local-runner" },
+    localReceipt: null,
     mcpReceipts: [],
   };
+  evidenceBundle.localReceipt = { bundleHash: localEvidenceFingerprint(evidenceBundle), source: "deterministic-local-runner" };
   const failures = metrics.filter((metric) => metric.variant === "candidate" && !metric.safeAreaPass);
   if (failures.length !== 5) throw new Error(`Expected five measured rc1 safe-area regressions; found ${failures.length}`);
   const heroCandidate = [...failures].sort((a, b) => b.violationPx - a.violationPx)[0] ?? metrics.find((m) => m.variant === "candidate")!;
@@ -189,7 +192,7 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
     synthetic: true,
     sourceEvidenceIds: [manifestChangeEvidence.id, manifestDefectEvidence.id],
     affectedStages: [...manifest.affectedStages],
-    workflowImpact: "Maya's portrait finishing path uses this compositor for reframe, caption layout, and burn-in; the changed multiline code path directly determines whether 9:16 deliverables remain publishable.",
+    workflowImpact: "Avery's automated portrait-video pipeline uses this compositor for reframe, caption layout, and burn-in; the changed multiline code path directly determines whether thousands of scheduled deliverables remain publishable.",
   };
   const datasetEvidence = createEvidenceItem({
     idHint: `${experimentId}:dataset`, sourceType: "dataset_manifest",
@@ -253,7 +256,7 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
     supportChecks: [
       { name: "source_authority", status: "verified", basis: "repository-owned manifest discloses the local candidate and defect" },
       { name: "provenance_integrity", status: "verified", basis: "all evidence is content-fingerprinted and explicitly local/synthetic" },
-      { name: "direct_applicability", status: "verified", basis: "component, rc1 version, and multiline caption path match Maya's workflow" },
+      { name: "direct_applicability", status: "verified", basis: "component, rc1 version, and multiline caption path match Avery's automated media workflow" },
       { name: "baseline_candidate_reproduction", status: "verified", basis: "locked baseline passes and the same five candidate clips fail decoded-pixel QA" },
       { name: "canary_coverage", status: "verified", basis: "8/8 cases and 16/16 paired runs completed" },
       {
@@ -295,11 +298,24 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
     change, evidenceCasefileFingerprint: evidenceCasefile.fingerprint, signalFingerprint: fingerprint(evidenceCasefile.signal),
     canaryPackId: canaryPack.id, canaryPackVersion: canaryPack.version, canaryPackFingerprint: canaryPack.fingerprint,
     canaryRunFingerprint: canaryRun.fingerprint, policyName: loadedPolicy.policy.name, policyVersion: loadedPolicy.policy.version,
-    policyHash: loadedPolicy.hash, verdict: localDecision.decision, reasons: receiptReasons, issuedAt: generatedAt, provenance: "local/synthetic",
+    policyHash: loadedPolicy.hash, toolchain, verdict: localDecision.decision, reasons: receiptReasons, issuedAt: generatedAt, provenance: "local/synthetic",
   });
   const decisionOutcome = createDecisionOutcomeFixture(decisionReceipt, generatedAt);
   const decisionCard: DecisionCard = {
     ...localDecision,
+    operatorContext: {
+      name: "Avery Morgan",
+      role: "Media Platform Lead",
+      organization: "Loopline Studios — fictional scenario",
+      fictional: true,
+      moment: "Friday · 09:12 · before the campaign render queue",
+      question: "The dependency PR is green and promises faster renders. Is it safe to merge before thousands of videos run?",
+    },
+    upgradeRequest: {
+      source: "automated dependency pull request",
+      benefitClaim: "Fuse three media stages into one compositor pass for faster rendering.",
+      statusBeforeGreenlight: "Install succeeds · unit tests pass · output files are valid",
+    },
     headline: `${failures.length}/8 candidate captions violate the 9:16 safe area; maximum measured overflow is ${maxViolation}px.`,
     baselineVersion: manifest.baseline,
     baselineDigest,
@@ -320,7 +336,9 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
       ? "Keep caption-compositor@0.1.0 in production. Move multiline anchoring to final portrait coordinates, then replay this locked eight-clip canary."
       : "Candidate is eligible for human promotion review.",
     mcpReceipts: [],
+    grafanaWorkflowReceipts: [],
     grafanaEvidenceRefs: [],
+    grafanaDashboardUrl: null,
     traceIds: [heroBaseline.traceId, heroCandidate.traceId],
     gitCommit: gitCommit(),
     geminiModel: "model" in planner && typeof planner.model === "string"
@@ -335,6 +353,7 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
     canaryRun,
     decisionReceiptFingerprint: decisionReceipt.fingerprint,
     policyOwner: "deterministic-policy-evaluator",
+    toolchain,
     renderComparison: {
       baseline: { path: heroBaseline.renderPath, compositorPasses: heroBaseline.compositorPasses, p95DurationMs: round(baselineP95, 1) },
       candidate: { path: heroCandidate.renderPath, compositorPasses: heroCandidate.compositorPasses, p95DurationMs: round(candidateP95, 1) },
@@ -367,6 +386,7 @@ export async function runCanary(options: { planner?: ExperimentPlanner } = {}): 
     expectedCoverage: loadedPolicy.policy.requiredRunCoverage,
     datasetHash,
     policyHash: loadedPolicy.hash,
+    toolchain,
     manifestHash,
     evidenceBundleHash: evidenceBundle.localReceipt?.bundleHash,
     evidenceCasefileFingerprint: evidenceCasefile.fingerprint,

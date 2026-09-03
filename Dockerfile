@@ -1,7 +1,7 @@
 FROM node:24-bookworm-slim
 
 RUN apt-get update \
-  && apt-get install --yes --no-install-recommends ffmpeg ca-certificates \
+  && apt-get install --yes --no-install-recommends ffmpeg ca-certificates fontconfig \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -11,9 +11,8 @@ RUN npm ci --ignore-scripts
 COPY . .
 ARG GREENLIGHT_GIT_COMMIT=container-build-unattributed
 ENV GREENLIGHT_GIT_COMMIT=$GREENLIGHT_GIT_COMMIT
-RUN npm run typecheck \
-  && npm test \
-  && npm run canary \
+RUN npm run receipt:verify \
+  && npm run public:live \
   && npm run build
 
 ENV NODE_ENV=production

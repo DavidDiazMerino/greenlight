@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { runCanary } from "./canary.ts";
 import { runLiveIntegration } from "./live.ts";
+import { setupGrafana } from "./grafana-setup.ts";
 import { projectRoot } from "./util.ts";
 
 const command = process.argv[2];
@@ -27,7 +28,15 @@ if (command === "canary" || command === "demo-fixture") {
     process.stderr.write(`Greenlight live integration failed: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
   }
+} else if (command === "grafana-setup") {
+  try {
+    const result = await setupGrafana();
+    process.stdout.write(`Grafana dashboard and alert verified through MCP.\nCapture: ${result.capturePath}\n`);
+  } catch (error) {
+    process.stderr.write(`Greenlight Grafana setup failed: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  }
 } else {
-  process.stderr.write("Usage: node src/cli.ts canary|demo-fixture|agent-live|clean-generated\n");
+  process.stderr.write("Usage: node src/cli.ts canary|demo-fixture|grafana-setup|agent-live|clean-generated\n");
   process.exitCode = 2;
 }

@@ -1,10 +1,9 @@
 node_modules/
 .git/
 dist/
-artifacts/*
-!artifacts/.gitkeep
 assets/synthetic/generated/
 .env
 .env.*
 *.log
 .DS_Store
+media/

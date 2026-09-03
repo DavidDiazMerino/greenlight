@@ -126,7 +126,7 @@ export class GeminiAdkDecisionExplainer {
     const raw = await this.runtime.explainDecision({
       immutableVerdict: decision,
       evidence: bundle,
-      instruction: "Explain the measured cause for a post-production supervisor and propose a replayable corrective action. Do not change the verdict or thresholds.",
+      instruction: "Explain the measured cause for a media platform lead reviewing a dependency update and propose a replayable corrective action. Do not change the verdict or thresholds.",
       outputSchema: "DecisionNarrative@1",
     });
     if (!raw || typeof raw !== "object") throw new Error("Gemini/ADK returned no DecisionNarrative object");

@@ -1,38 +1,50 @@
 import { readFile } from "node:fs/promises";
 import type { CanaryRun, DecisionVerdict, EvidenceBundle, EvidenceKind, EvidenceResilienceAssessment, GateResult, McpReceipt, Policy, PolicyDecision } from "./types.ts";
+import { parse } from "yaml";
+import { localEvidenceFingerprint, verifyMcpReceipt } from "./integrity.ts";
 import { percentile95, round, sha256 } from "./util.ts";
 
-function scalar(source: string, key: string): string {
-  const match = source.match(new RegExp(`^\\s*${key}:\\s*([^#\\n]+)`, "m"));
-  if (!match) throw new Error(`Policy field missing: ${key}`);
-  return match[1].trim();
-}
+export const TRUSTED_POLICY_HASH = "sha256:6a909329bd4c0312ddf1dd7faeb455123439a2ae5101aaae490c8c8487494673";
 
-export async function loadPolicy(path: string): Promise<{ policy: Policy; hash: string }> {
+export async function loadPolicy(path: string, expectedHash: string | null = TRUSTED_POLICY_HASH): Promise<{ policy: Policy; hash: string }> {
   const source = await readFile(path, "utf8");
-  const requiredEvidence = [...source.matchAll(/^\s*-\s+(metrics|logs|traces)\s*$/gm)].map((m) => m[1] as EvidenceKind);
-  const rates = [...source.matchAll(/^\s+required:\s*([0-9.]+)\s*$/gm)].map((m) => Number(m[1]));
+  const hash = sha256(source);
+  if (expectedHash && hash !== expectedHash) throw new Error(`Policy trust check failed: expected ${expectedHash}, received ${hash}`);
+  const document = parse(source) as Record<string, unknown>;
+  const requiredEvidence = document.required_evidence;
+  const gates = document.gates as Record<string, Record<string, unknown>> | undefined;
+  if (!Array.isArray(requiredEvidence) || !requiredEvidence.every((item) => ["metrics", "logs", "traces"].includes(String(item)))) {
+    throw new Error("Policy required_evidence must contain only metrics, logs, and traces");
+  }
+  const number = (value: unknown, field: string): number => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new Error(`Policy field must be numeric: ${field}`);
+    return parsed;
+  };
+  if (!gates) throw new Error("Policy gates are missing");
   return {
-    hash: sha256(source),
+    hash,
     policy: {
-      name: scalar(source, "name"),
-      version: scalar(source, "version"),
-      requiredEvidence,
-      requiredRunCoverage: Number(scalar(source, "required_run_coverage")),
-      safeAreaRequired: rates[0],
-      outputValidityRequired: rates[1],
-      p95MaxRegression: Number(scalar(source, "max_regression")),
+      name: String(document.name ?? ""),
+      version: String(document.version ?? ""),
+      requiredEvidence: requiredEvidence as EvidenceKind[],
+      requiredRunCoverage: number(document.required_run_coverage, "required_run_coverage"),
+      safeAreaRequired: number(gates.caption_safe_area_pass_rate?.required, "gates.caption_safe_area_pass_rate.required"),
+      outputValidityRequired: number(gates.output_validity_pass_rate?.required, "gates.output_validity_pass_rate.required"),
+      p95MaxRegression: number(gates.p95_render_duration?.max_regression, "gates.p95_render_duration.max_regression"),
     },
   };
 }
 
-function validMcpReceipts(receipts: McpReceipt[], required: EvidenceKind[]): boolean {
+function validMcpReceipts(bundle: EvidenceBundle, required: EvidenceKind[]): boolean {
+  const receipts = bundle.mcpReceipts;
+  const proofs = bundle.mcpProofs ?? [];
   const validByKind = required.every((kind) => receipts.some((receipt) =>
     receipt.kind === kind &&
     receipt.receiptId.length > 0 &&
     receipt.serverIdentity.length > 0 &&
     receipt.toolName.length > 0 &&
-    receipt.resultHash.startsWith("sha256:")
+    verifyMcpReceipt(receipt, proofs)
   ));
   const pairedTraceIds = new Set(receipts.filter((receipt) => receipt.kind === "traces").flatMap((receipt) => receipt.traceIds ?? []));
   return validByKind && (!required.includes("traces") || pairedTraceIds.size >= 2);
@@ -54,8 +66,8 @@ export function evaluatePolicy(
   const failedClipIds = new Set(bundle.metrics.filter((metric) => !metric.safeAreaPass || !metric.outputValid).map((metric) => `${metric.variant}:${metric.clipId}`));
   const failedLogsComplete = [...failedClipIds].every((key) => bundle.logs.some((log) => `${log.variant}:${log.clip_id}` === key));
   const provenanceComplete = options.requireMcp
-    ? bundle.provenance === "grafana-mcp" && validMcpReceipts(bundle.mcpReceipts, policy.requiredEvidence)
-    : bundle.provenance === "local/synthetic" && bundle.synthetic && bundle.localReceipt?.bundleHash.startsWith("sha256:") === true;
+    ? bundle.provenance === "grafana-mcp" && validMcpReceipts(bundle, policy.requiredEvidence)
+    : bundle.provenance === "local/synthetic" && bundle.synthetic && bundle.localReceipt?.bundleHash === localEvidenceFingerprint(bundle);
   const baseline = bundle.metrics.filter((m) => m.variant === "baseline" && m.runCompleted);
   const candidate = bundle.metrics.filter((m) => m.variant === "candidate" && m.runCompleted);
   const coverage = baseline.length + candidate.length;

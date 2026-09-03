@@ -16,6 +16,13 @@ const mime: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
+const securityHeaders = {
+  "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+  "referrer-policy": "no-referrer",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+};
+
 export function resolveRequest(url: string, roots: { project: string; web: string }): string | null {
   const pathname = decodeURIComponent(new URL(url, "http://localhost").pathname);
   const base = pathname.startsWith("/artifacts/") ? roots.project : roots.web;
@@ -28,21 +35,22 @@ export function resolveRequest(url: string, roots: { project: string; web: strin
 export function createGreenlightServer(roots = { project: projectRoot, web: join(projectRoot, "src", "web") }) {
   return createServer(async (request, response) => {
     try {
-      if (request.url === "/healthz") {
-        response.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      if (request.url === "/health") {
+        response.writeHead(200, { ...securityHeaders, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
         response.end('{"status":"ok"}\n');
         return;
       }
       const path = resolveRequest(request.url ?? "/", roots);
       if (!path || !(await stat(path)).isFile()) throw new Error("not found");
       response.writeHead(200, {
+        ...securityHeaders,
         "content-type": mime[extname(path)] ?? "application/octet-stream",
         "cache-control": "no-store",
         "access-control-allow-origin": "*",
       });
       response.end(await readFile(path));
     } catch {
-      response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      response.writeHead(404, { ...securityHeaders, "content-type": "text/plain; charset=utf-8" });
       response.end("Not found. Run `make canary` first for generated evidence.\n");
     }
   });

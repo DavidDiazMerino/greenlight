@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "1.0",
+  "verificationType": "credentialed-live-sanitized",
+  "verifiedAt": "2026-09-02T18:49:58.893Z",
+  "provenance": "grafana-mcp",
+  "synthetic": true,
+  "fixtureScope": "local/synthetic canary exported to a real Grafana Cloud stack",
+  "model": "gemini-2.5-flash",
+  "mcpEndpoint": "https://mcp.grafana.com/mcp",
+  "discoveredToolCount": 119,
+  "experimentId": "gl-local-c622bbb0e382",
+  "grafanaDashboardUrl": "https://merryboxwood1367.grafana.net/d/greenlight-release-gate?from=1788374850296&to=1788375181885&var-experiment_id=gl-local-c622bbb0e382",
+  "narrative": {
+    "diagnosis": "The firing Greenlight alert is explained by a measured 61 px caption safe-area overflow in five of eight candidate clips. Prometheus, Loki, and Tempo returned non-empty evidence for the same experiment while the deterministic policy retained HOLD.",
+    "recommendedAction": "Keep the baseline compositor in production, move multiline caption anchoring into final portrait coordinates, and replay the locked canary before human promotion review."
+  },
+  "decision": {
+    "verdict": "HOLD",
+    "policyOwner": "deterministic-policy-evaluator",
+    "verdictChangedByAgent": false,
+    "candidateFailures": 5,
+    "maximumViolationPx": 61,
+    "decisionReceiptFingerprint": "sha256:7500762fc3adb52d297c73a519bbf0732e31fcfa7d543117000b6de8ae9b6548"
+  },
+  "evidenceReceipts": [
+    {
+      "kind": "metrics",
+      "toolName": "query_prometheus",
+      "receiptId": "1bbdb41f2e04975048d3dc4308128e759a9515e207748961ef2c3f97df6823ea",
+      "resultHash": "sha256:4f0f365a3a1bd4ea7e1774934c51ffb8e426b54d6c1e927362261ae02a60bb74",
+      "dataPresent": true
+    },
+    {
+      "kind": "metrics",
+      "toolName": "query_prometheus",
+      "receiptId": "a2845ab441a12524488b63e3d079f5d6cbbb414a0410d3d84904614112079d9f",
+      "resultHash": "sha256:0d43dfe48d720e2d961df5db91291ab08de8b1dfb4d72fdff2d633fc39cbd2cf",
+      "dataPresent": true
+    },
+    {
+      "kind": "logs",
+      "toolName": "query_loki_logs",
+      "receiptId": "31d1e2120a302301254545bfbe72c9465dbec37b48fac398484ab5fc1679f247",
+      "resultHash": "sha256:3f169a82ea1760f79bdfa1f7c35b620270b74d87d59d1e26b9bf9d858c3528bc",
+      "dataPresent": true
+    },
+    {
+      "kind": "traces",
+      "toolName": "tempo_traceql-search",
+      "receiptId": "b581bf552067087225153792955f573c9be4c9efbb63581b7ab1e9d690c1a262",
+      "resultHash": "sha256:0e658a95d70385a20a03e5e9f6778843e46bc88d4630650fd42e522819d1f3d6",
+      "dataPresent": true,
+      "returnedTraceIds": 11
+    }
+  ],
+  "workflowReceipts": [
+    {
+      "kind": "alert",
+      "toolName": "alerting_manage_rules",
+      "receiptId": "12d3e2d55d9b223fd9247ec3468f4c6baf2bc007e994b778f67a473493e35d54",
+      "resultHash": "sha256:d45dfaef7e261d24e3f011626309443ab278ad98f0cba12a4385c362fb9cba94",
+      "succeeded": true,
+      "verifiedState": "firing"
+    },
+    {
+      "kind": "dashboard-search",
+      "toolName": "search_dashboards",
+      "receiptId": "c43d3ed000975ba8f932df62ca141fce74ff17ad653de38cfc2873c0cf9b438d",
+      "resultHash": "sha256:219ffeece6a985b555fbb9575033920797d2cac5ddb6937532809e5ea6a79110",
+      "succeeded": true,
+      "verifiedDashboardUid": "greenlight-release-gate"
+    },
+    {
+      "kind": "annotation",
+      "toolName": "create_annotation",
+      "receiptId": "20b2af5a8d956c8c8e4d8820cae6c7efeff521397945ee631ec4174416c0dc9d",
+      "resultHash": "sha256:19dfa04363b7684c169f9bb56362f558ac4941d826cbdf19630da3597f7bd9e9",
+      "succeeded": true
+    },
+    {
+      "kind": "navigation",
+      "toolName": "generate_deeplink",
+      "receiptId": "4c7ecd39fbdac38e3e05a27027db555223891015e0a4c39d6cc3d995cb3a4629",
+      "resultHash": "sha256:57ebb69f2e251cba5b0b903b9456beebf9d300299a59f6382b2fa85b7d17ea4e",
+      "succeeded": true,
+      "sameStackUrlVerified": true
+    }
+  ],
+  "sanitization": {
+    "rawMcpResultsIncluded": false,
+    "oauthTokensIncluded": false,
+    "otlpHeadersIncluded": false,
+    "googleCredentialsIncluded": false
+  }
+}

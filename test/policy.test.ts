@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { join } from "node:path";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { DeterministicExperimentPlanner } from "../src/adapters/gemini.ts";
 import { captionLayout, renderPipeline } from "../src/media.ts";
 import { evaluatePolicy, loadPolicy } from "../src/policy.ts";
 import type { CanaryRun, CandidateManifest, Dataset, EvidenceBundle, EvidenceResilienceAssessment, MediaQaResult, Variant } from "../src/types.ts";
 import { projectRoot, readJson } from "../src/util.ts";
+import { localEvidenceFingerprint, mcpReceiptId } from "../src/integrity.ts";
+import { fingerprint } from "../src/util.ts";
 
 const observedAt = "2026-08-24T00:00:00.000Z";
 
@@ -45,7 +49,7 @@ function bundle(candidateFailures: number): EvidenceBundle {
     ...Array.from({ length: 8 }, (_, index) => metric(index, "baseline")),
     ...Array.from({ length: 8 }, (_, index) => metric(index, "candidate", index >= candidateFailures)),
   ];
-  return {
+  const evidence: EvidenceBundle = {
     schemaVersion: "1.0",
     experimentId: "test-experiment",
     provenance: "local/synthetic",
@@ -73,10 +77,17 @@ function bundle(candidateFailures: number): EvidenceBundle {
       endUnixMs: index + 1,
       attributes: { variant: item.variant, clip_id: item.clipId, experiment_id: item.experimentId },
     })),
+    toolchain: {
+      font: { family: "DejaVu Sans", path: "assets/fonts/DejaVuSans.ttf", sha256: "sha256:font", fontConfigSha256: "sha256:fontconfig" },
+      ffmpeg: { version: "ffmpeg test", binaryFingerprint: "sha256:ffmpeg" },
+      ffprobe: { version: "ffprobe test", binaryFingerprint: "sha256:ffprobe" },
+    },
     evidencePresent: ["metrics", "logs", "traces"],
-    localReceipt: { bundleHash: "sha256:test", source: "deterministic-local-runner" },
+    localReceipt: null,
     mcpReceipts: [],
   };
+  evidence.localReceipt = { bundleHash: localEvidenceFingerprint(evidence), source: "deterministic-local-runner" };
+  return evidence;
 }
 
 function eligibleResilience(): EvidenceResilienceAssessment {
@@ -166,14 +177,67 @@ test("MCP-required evidence accepts a baseline/candidate trace pair across recei
   evidence.provenance = "grafana-mcp";
   evidence.synthetic = true;
   evidence.localReceipt = null;
-  evidence.mcpReceipts = [
-    { receiptId: "metrics", kind: "metrics", serverIdentity: "grafana-test", toolName: "query_prometheus", query: {}, resultHash: "sha256:metrics", receivedAt: observedAt },
-    { receiptId: "logs", kind: "logs", serverIdentity: "grafana-test", toolName: "query_loki_logs", query: {}, resultHash: "sha256:logs", receivedAt: observedAt },
-    { receiptId: "trace-baseline", kind: "traces", serverIdentity: "grafana-test", toolName: "tempo_get_trace", query: {}, resultHash: "sha256:trace-baseline", receivedAt: observedAt, traceIds: ["0123456789abcdef0123456789abcdef"] },
-    { receiptId: "trace-candidate", kind: "traces", serverIdentity: "grafana-test", toolName: "tempo_get_trace", query: {}, resultHash: "sha256:trace-candidate", receivedAt: observedAt, traceIds: ["fedcba9876543210fedcba9876543210"] },
+  const proofInputs = [
+    { kind: "metrics" as const, toolName: "query_prometheus", result: { data: [{ value: 1 }] }, traceIds: undefined },
+    { kind: "logs" as const, toolName: "query_loki_logs", result: { data: [{ line: "ok" }] }, traceIds: undefined },
+    { kind: "traces" as const, toolName: "tempo_get_trace", result: { traces: [{ traceId: "0123456789abcdef0123456789abcdef" }] }, traceIds: ["0123456789abcdef0123456789abcdef"] },
+    { kind: "traces" as const, toolName: "tempo_get_trace", result: { traces: [{ traceId: "fedcba9876543210fedcba9876543210" }] }, traceIds: ["fedcba9876543210fedcba9876543210"] },
   ];
+  evidence.mcpReceipts = proofInputs.map(({ kind, toolName, result, traceIds }) => {
+    const base = { kind, serverIdentity: "grafana-test", toolName, query: {}, resultHash: fingerprint(result), receivedAt: observedAt, dataPresent: true, traceIds };
+    return { ...base, receiptId: mcpReceiptId(base) };
+  });
+  evidence.mcpProofs = evidence.mcpReceipts.map((receipt, index) => ({ receiptId: receipt.receiptId, result: proofInputs[index].result }));
   const result = evaluatePolicy(evidence, policy, { requireMcp: true, resilience: eligibleResilience() });
   assert.equal(result.decision, "PROMOTE");
+});
+
+test("forged local and MCP receipt hashes fail closed", async () => {
+  const { policy } = await fixture();
+  const local = bundle(0);
+  local.localReceipt!.bundleHash = `sha256:${"0".repeat(64)}`;
+  assert.equal(evaluatePolicy(local, policy, { requireMcp: false, resilience: eligibleResilience() }).reason, "INSUFFICIENT_EVIDENCE");
+
+  const remote = bundle(0);
+  remote.provenance = "grafana-mcp";
+  remote.localReceipt = null;
+  remote.mcpReceipts = [{
+    receiptId: "forged",
+    kind: "metrics",
+    serverIdentity: "grafana-test",
+    toolName: "query_prometheus",
+    query: {},
+    resultHash: `sha256:${"0".repeat(64)}`,
+    dataPresent: true,
+  }];
+  remote.mcpProofs = [{ receiptId: "forged", result: { data: [{ value: 1 }] } }];
+  assert.equal(evaluatePolicy(remote, policy, { requireMcp: true, resilience: eligibleResilience() }).reason, "INSUFFICIENT_EVIDENCE");
+});
+
+test("policy parsing follows named YAML gates rather than document order", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "greenlight-policy-"));
+  const path = join(directory, "reordered.yaml");
+  try {
+    await writeFile(path, [
+      "name: vertical-delivery",
+      "version: v1",
+      "required_evidence: [metrics, logs, traces]",
+      "required_run_coverage: 16",
+      "gates:",
+      "  output_validity_pass_rate:",
+      "    required: 0.75",
+      "  p95_render_duration:",
+      "    max_regression: 0.2",
+      "  caption_safe_area_pass_rate:",
+      "    required: 1.0",
+    ].join("\n"), "utf8");
+    const { policy } = await loadPolicy(path, null);
+    assert.equal(policy.safeAreaRequired, 1);
+    assert.equal(policy.outputValidityRequired, 0.75);
+    assert.equal(policy.p95MaxRegression, 0.2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("rc1 coordinate transform places multiline blocks outside the safe area", async () => {

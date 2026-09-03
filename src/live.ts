@@ -3,12 +3,17 @@ import { join } from "node:path";
 import { copyFile } from "node:fs/promises";
 import { GeminiAdkExperimentPlanner } from "./adapters/gemini.ts";
 import { GoogleAdkAgentRuntime } from "./adapters/google-adk-runtime.ts";
-import { createGrafanaCloudMcpToolset, GRAFANA_CLOUD_MCP_ENDPOINT, normalizeGrafanaStackUrl, normalizeMcpEndpoint, runGrafanaEvidenceAgent } from "./adapters/grafana-adk.ts";
+import { createGrafanaCloudMcpToolset, extractGrafanaDashboardUrl, GRAFANA_CLOUD_MCP_ENDPOINT, normalizeGrafanaStackUrl, normalizeMcpEndpoint, runGrafanaEvidenceAgent } from "./adapters/grafana-adk.ts";
 import { authorizeGrafanaMcp, PersistentGrafanaOAuthProvider } from "./adapters/grafana-oauth.ts";
 import { OtlpHttpExporter } from "./adapters/otel.ts";
-import { runCanary } from "./canary.ts";
-import type { DecisionCard } from "./types.ts";
-import { hashFile, projectRoot, writeJson } from "./util.ts";
+import { runCanary, type CanaryResult } from "./canary.ts";
+import type { DecisionCard, DecisionOutcome, DecisionReceipt, EvidenceBundle, EvidenceCasefile } from "./types.ts";
+import { hashFile, projectRoot, readJson, writeJson } from "./util.ts";
+import { evaluatePolicy, loadPolicy } from "./policy.ts";
+
+const GREENLIGHT_DASHBOARD_UID = "greenlight-release-gate";
+const GREENLIGHT_DASHBOARD_TITLE = "Greenlight Release Gate";
+const GREENLIGHT_ALERT_TITLE = "Greenlight caption safe-area violation";
 
 interface LiveConfig {
   project: string;
@@ -65,7 +70,9 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
   });
   const adkRuntime = new GoogleAdkAgentRuntime({ model: config.model });
   const planner = new GeminiAdkExperimentPlanner(adkRuntime, config.model);
-  const canary = await runCanary({ planner });
+  const canary = process.env.GREENLIGHT_REUSE_LATEST_CANARY === "true"
+    ? await loadLatestCanary()
+    : await runCanary({ planner });
 
   await exporter.export({
     metrics: canary.evidenceBundle.metrics,
@@ -83,6 +90,19 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
     to: new Date(Math.max(...timestamps) + 120_000).toISOString(),
   };
   const experimentSelector = JSON.stringify(canary.experimentId);
+  const highestFailure = canary.evidenceBundle.metrics
+    .filter((item) => item.variant === "candidate" && !item.safeAreaPass)
+    .sort((left, right) => right.violationPx - left.violationPx || left.clipId.localeCompare(right.clipId))[0];
+  if (!highestFailure) throw new Error("Live investigation requires a measured candidate failure");
+  const decisionAnnotation = [
+    `${canary.decisionCard.decision} · caption-safe-area-9x16`,
+    `${canary.decisionCard.affectedAssets.length}/8 candidate clips`,
+    `root cause clip ${highestFailure.clipId}`,
+    `max overflow ${highestFailure.violationPx} px`,
+    `trace ${highestFailure.traceId}`,
+    `decision receipt ${canary.decisionReceipt.fingerprint}`,
+    "Verdict owner: deterministic-policy-evaluator",
+  ].join(" · ");
   const result = await runGrafanaEvidenceAgent({
     model: config.model,
     toolset,
@@ -101,6 +121,11 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
         maximumViolationPx: Math.max(...canary.evidenceBundle.metrics.map((item) => item.violationPx)),
         baselineTraceIds: canary.evidenceBundle.metrics.filter((item) => item.variant === "baseline").map((item) => item.traceId),
         candidateTraceIds: canary.evidenceBundle.metrics.filter((item) => item.variant === "candidate").map((item) => item.traceId),
+        highestFailure: {
+          clipId: highestFailure.clipId,
+          violationPx: highestFailure.violationPx,
+          traceId: highestFailure.traceId,
+        },
       },
       queryPlan: [
         {
@@ -148,8 +173,99 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
           },
         },
       ],
+      workflowPlan: [
+        {
+          kind: "alert",
+          toolName: "alerting_manage_rules",
+          args: {
+            operation: "list",
+            search_rule_name: GREENLIGHT_ALERT_TITLE,
+            states: ["firing"],
+            rule_limit: 10,
+            limit_alerts: 10,
+          },
+        },
+        {
+          kind: "dashboard-search",
+          toolName: "search_dashboards",
+          args: { query: GREENLIGHT_DASHBOARD_TITLE, limit: 10, page: 1 },
+        },
+        {
+          kind: "annotation",
+          toolName: "create_annotation",
+          args: {
+            dashboardUid: GREENLIGHT_DASHBOARD_UID,
+            time: new Date(canary.decisionCard.completedAt).getTime(),
+            tags: ["greenlight", "release-gate", canary.experimentId, canary.decisionCard.decision.toLowerCase()],
+            text: decisionAnnotation,
+            data: {
+              experimentId: canary.experimentId,
+              decisionReceiptFingerprint: canary.decisionReceipt.fingerprint,
+              policyOwner: "deterministic-policy-evaluator",
+              verdictChangedByAgent: false,
+              rootCauseClipId: highestFailure.clipId,
+              rootCauseViolationPx: highestFailure.violationPx,
+              rootCauseTraceId: highestFailure.traceId,
+            },
+          },
+        },
+        {
+          kind: "navigation",
+          toolName: "generate_deeplink",
+          args: {
+            resourceType: "dashboard",
+            dashboardUid: GREENLIGHT_DASHBOARD_UID,
+            timeRange: { from: window.from, to: window.to },
+            queryParams: { "var-experiment_id": canary.experimentId },
+            shorten: false,
+          },
+        },
+      ],
     },
   });
+
+  const alertCall = result.calls.find((call) => "kind" in call && call.kind === "alert");
+  if (!alertCall || !resultContainsText(alertCall.result, GREENLIGHT_ALERT_TITLE) || !resultContainsText(alertCall.result, "firing")) {
+    throw new Error(`Grafana Evidence Agent did not verify the firing alert: ${GREENLIGHT_ALERT_TITLE}`);
+  }
+  const dashboardSearchCall = result.calls.find((call) => "kind" in call && call.kind === "dashboard-search");
+  if (!dashboardSearchCall || !resultContainsText(dashboardSearchCall.result, GREENLIGHT_DASHBOARD_UID)) {
+    throw new Error(`Grafana Evidence Agent did not find dashboard UID: ${GREENLIGHT_DASHBOARD_UID}`);
+  }
+  const navigationCall = result.calls.find((call) => "kind" in call && call.kind === "navigation");
+  const grafanaDashboardUrl = navigationCall ? extractGrafanaDashboardUrl(navigationCall.result, stackOrigin) : null;
+  if (!grafanaDashboardUrl) throw new Error("Grafana Evidence Agent did not return a valid same-stack dashboard link");
+  if (new URL(grafanaDashboardUrl).searchParams.get("var-experiment_id") !== canary.experimentId) {
+    throw new Error("Grafana dashboard link is not scoped to the current experiment");
+  }
+  const traceReceipt = result.receipts.find((receipt) => receipt.kind === "traces" && receipt.traceIds?.includes(highestFailure.traceId));
+  if (!traceReceipt) throw new Error(`Grafana trace evidence did not contain root-cause trace ${highestFailure.traceId}`);
+  for (const expected of [highestFailure.clipId, String(highestFailure.violationPx), highestFailure.traceId]) {
+    if (!result.narrative.diagnosis.includes(expected)) {
+      throw new Error(`Grafana diagnosis did not preserve root-cause value: ${expected}`);
+    }
+  }
+
+  const mcpProofs = result.receipts.map((receipt) => {
+    const call = result.calls.find((item) => item.receiptId === receipt.receiptId);
+    if (!call) throw new Error(`Missing raw MCP proof for receipt ${receipt.receiptId}`);
+    return { receiptId: receipt.receiptId, result: call.result };
+  });
+  const loadedPolicy = await loadPolicy(join(projectRoot, "policy", "vertical-delivery-v1.yaml"));
+  const liveDecision = evaluatePolicy({
+    ...canary.evidenceBundle,
+    provenance: "grafana-mcp",
+    localReceipt: null,
+    mcpReceipts: result.receipts,
+    mcpProofs,
+  }, loadedPolicy.policy, {
+    requireMcp: true,
+    resilience: canary.decisionCard.evidenceCasefile.resilience,
+    canaryRun: canary.decisionCard.canaryRun,
+  });
+  if (liveDecision.decision !== canary.decisionCard.decision || liveDecision.reason !== canary.decisionCard.reason) {
+    throw new Error(`MCP-required policy re-evaluation diverged: ${liveDecision.decision}/${liveDecision.reason}`);
+  }
 
   const capturePath = join(canary.artifactDir, "grafana-adk-run.json");
   await writeJson(capturePath, {
@@ -162,14 +278,24 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
         dataPresent: result.receipts.some((receipt) => receipt.kind === kind && receipt.dataPresent),
         receiptIds: result.receipts.filter((receipt) => receipt.kind === kind).map((receipt) => receipt.receiptId),
       }])),
+      workflowReceiptIds: result.workflowReceipts.map((receipt) => receipt.receiptId),
+      mcpPolicyReevaluation: {
+        decision: liveDecision.decision,
+        reason: liveDecision.reason,
+        rawProofsRehashed: mcpProofs.length,
+        matchesLocalVerdict: true,
+      },
     },
   });
   const decisionCard: DecisionCard = {
     ...canary.decisionCard,
+    ...liveDecision,
     diagnosis: result.narrative.diagnosis,
     recommendedAction: result.narrative.recommendedAction,
     mcpReceipts: result.receipts,
+    grafanaWorkflowReceipts: result.workflowReceipts,
     grafanaEvidenceRefs: [`artifacts/${canary.experimentId}/grafana-adk-run.json`],
+    grafanaDashboardUrl,
     traceIds: [...new Set([...canary.decisionCard.traceIds, ...result.receipts.flatMap((receipt) => receipt.traceIds ?? [])])],
     geminiModel: config.model,
     replayCommand: "npm run agent:live",
@@ -193,6 +319,37 @@ export async function runLiveIntegration(config = loadLiveConfig()): Promise<{
     copyFile(integrationIndex, join(latest, "live-integration-index.json")),
   ]);
   return { artifactDir: canary.artifactDir, capturePath, cardPath, decisionCard };
+}
+
+async function loadLatestCanary(): Promise<CanaryResult> {
+  const latest = join(projectRoot, "artifacts", "latest");
+  const [decisionCard, evidenceBundle, evidenceCasefile, decisionReceipt, decisionOutcome] = await Promise.all([
+    readJson<DecisionCard>(join(latest, "decision-card.json")),
+    readJson<EvidenceBundle>(join(latest, "evidence-bundle.json")),
+    readJson<EvidenceCasefile>(join(latest, "evidence-casefile.json")),
+    readJson<DecisionReceipt>(join(latest, "decision-receipt.json")),
+    readJson<DecisionOutcome>(join(latest, "decision-outcome.fixture.json")),
+  ]);
+  if (decisionCard.decisionReceiptFingerprint !== decisionReceipt.fingerprint
+    || evidenceBundle.experimentId !== decisionCard.experimentId) {
+    throw new Error("Latest canary artifacts are not internally consistent");
+  }
+  return {
+    experimentId: decisionCard.experimentId,
+    artifactDir: join(projectRoot, "artifacts", decisionCard.experimentId),
+    decisionCard,
+    evidenceBundle,
+    evidenceCasefile,
+    decisionReceipt,
+    decisionOutcome,
+  };
+}
+
+function resultContainsText(value: unknown, expected: string): boolean {
+  if (typeof value === "string") return value.toLowerCase().includes(expected.toLowerCase());
+  if (Array.isArray(value)) return value.some((item) => resultContainsText(item, expected));
+  if (value && typeof value === "object") return Object.values(value as Record<string, unknown>).some((item) => resultContainsText(item, expected));
+  return false;
 }
 
 function parseOtlpHeaders(value: string): Record<string, string> {
